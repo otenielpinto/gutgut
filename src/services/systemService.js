@@ -68,11 +68,52 @@ async function started(id_tenant, name_service) {
   await updateService(id_tenant, name_service);
   return 0;
 }
+
+//criar classe para essa tarefa , refatorar
+async function monthlyTaskExecuted(id_tenant, name_service) {
+  let service = await getServiceById(id_tenant, name_service);
+  if (!service) return 0; // Not executed this month
+
+  if (service?.monthly_executed) {
+    let lastExecutionDate = new Date(service.monthly_executed);
+    let currentMonth = new Date().getMonth();
+    let lastExecutionMonth = lastExecutionDate.getMonth();
+
+    if (currentMonth !== lastExecutionMonth) {
+      return 0; // Not executed this month
+    }
+  }
+  return 1; // Executed this month
+}
+
+async function markMonthlyTaskExecuted(id_tenant, name_service) {
+  const client = await TMongo.connect();
+
+  let config = {
+    id: Number(id_tenant),
+    name: name_service,
+    monthly_executed: new Date(),
+  };
+
+  return client
+    .collection(tmp_service)
+    .updateOne(
+      { id: { $eq: id_tenant }, name: { $eq: name_service } },
+      { $set: config },
+      { upsert: true }
+    );
+
+  return 0;
+}
+
 const systemService = {
   started,
   getService,
   updateService,
   hasExec,
+
+  monthlyTaskExecuted,
+  markMonthlyTaskExecuted,
 };
 
 export { systemService };

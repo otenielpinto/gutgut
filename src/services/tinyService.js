@@ -9,12 +9,11 @@ function sleep(ms) {
 class Tiny {
   timeout = 0;
   local_status = "OK";
-  local_data = '';
+  local_data = "";
   constructor({ token }) {
     this.token = token;
-    this.local_data = '';
-    this.local_status = '';
-
+    this.local_data = "";
+    this.local_status = "";
   }
   async get(url) {
     data.push({ key: "token", value: this.token });
@@ -68,13 +67,65 @@ class Tiny {
   }
 
   setTimeout(timeout) {
-    if (timeout > 0)
-      console.log('Timeout setado para ', timeout)
+    if (timeout > 0) console.log("Timeout setado para ", timeout);
     this.timeout = timeout;
   }
 }
 
-export { Tiny };
+class TinyInfo {
+  constructor({ instance }) {
+    this.instance = instance;
+  }
+
+  async getPaginasProdutos() {
+    let page = 1;
+    let data = [
+      { key: "pesquisa", value: "" },
+      { key: "pagina", value: page },
+    ];
+    let response = await this.instance.post("produtos.pesquisa.php", data);
+    let {
+      retorno: { numero_paginas: page_count },
+    } = response?.data;
+    return page_count;
+  }
+
+  async getPaginasProdutosDataCriacao(dataCriacao) {
+    const data = [{ key: "dataCriacao", value: dataCriacao }];
+    let response = await this.instance.post("produtos.pesquisa.php", data);
+    let {
+      retorno: { numero_paginas: page_count },
+    } = response?.data;
+    return page_count;
+  }
+
+  async getPaginasPedidos(dataInicial) {
+    let page = 1;
+    let data = [
+      { key: "pesquisa", value: "" },
+      { key: "dataInicial", value: dataInicial },
+      { key: "pagina", value: page },
+    ];
+    let response = await this.instance.post("pedidos.pesquisa.php", data);
+    let {
+      retorno: { numero_paginas: page_count },
+    } = response?.data;
+    return page_count;
+  }
+
+  async getDataInicialPedidos() {
+    let pedido_numero_dias_processar =
+      Number(process.env.PEDIDO_NUMERO_DIAS_PROCESSAR) || 30;
+
+    let dataInicial = lib.formatDateBr(
+      lib.addDays(new Date(), pedido_numero_dias_processar * -1)
+    );
+
+    return String(dataInicial);
+  }
+}
+
+export { Tiny, TinyInfo };
 
 /*
 # inspiracao 

@@ -1,6 +1,6 @@
 import { lib } from "../utils/lib.js";
 import { AnuncioRepository } from "../repository/anuncioRepository.js";
-import { Tiny } from "../services/tinyService.js";
+import { Tiny, TinyInfo } from "../services/tinyService.js";
 import { TMongo } from "../infra/mongoClient.js";
 import { ProdutoTinyRepository } from "../repository/produtoTinyRepository.js";
 import { EstoqueRepository } from "../repository/estoqueRepository.js";
@@ -19,26 +19,66 @@ async function init() {
     await atualizarEstoqueEcommerce();
     return;
   }
-  //carga geral todos os dias 1 x ao dia
-  await importarProdutoTiny();
+
+  //importar mensalmente todos os produtos ( sincronização mensal )
+  await importarProdutoTinyMensal();
+
   //atualizar novos produtos cadastrados no tiny  5 minutos
   await importarProdutoTinyDiario();
 }
 
-async function importarProdutoTinyDiario() {
+async function importarProdutoTinyMensal() {
   let tenants = await mpkIntegracaoController.findAll(filterTiny);
-  var hoje = lib.formatDateBr(new Date());
+
+  let key = "importarProdutoTinyMensal";
+  for (let tenant of tenants) {
+    if ((await systemService.monthlyTaskExecuted(tenant.id_tenant, key)) == 1)
+      continue;
+    try {
+      await systemService.markMonthlyTaskExecuted(tenant.id_tenant, key);
+    } finally {
+      await importarProdutoTinyByTenant(tenant);
+    }
+  }
+}
+
+async function importarProdutoTinyDiario() {
+  TMongo.close();
+  let tenants = await mpkIntegracaoController.findAll(filterTiny);
   const c = await TMongo.connect();
+  const MAX_RECORDS = 100;
 
   for (let tenant of tenants) {
-    let response = await produtoPesquisaByDataCriacao(tenant, hoje);
-    if (!Array.isArray(response)) continue;
     let produtoTinyRepository = new ProdutoTinyRepository(c, tenant.id_tenant);
+    let tiny = new Tiny({ token: tenant.token });
+    let info = new TinyInfo({ instance: tiny });
 
-    for (let item of response) {
-      let obj = item?.produto ? item?.produto : {};
-      if (!obj?.id) continue;
-      await produtoTinyRepository.update(obj?.id, obj);
+    for (let idx = 5; idx >= 0; idx--) {
+      let desde = lib.formatDateBr(lib.addDays(new Date(), idx * -1));
+      let pages = await info.getPaginasProdutosDataCriacao(desde);
+      if (!pages || pages == 0) pages = 1;
+
+      console.log("Tenant:", tenant.id, "Desde : ", desde, " idx:", idx);
+      let page = 0;
+      while (page < pages) {
+        page++;
+        console.log("Pagina : ", page + "/" + pages);
+        let response = await produtoPesquisaByDataCriacao(tenant, desde, page);
+
+        if (!Array.isArray(response)) break;
+        console.log(
+          " A consulta retornou",
+          response?.length || 0,
+          " registros"
+        );
+
+        for (let item of response) {
+          let obj = item?.produto ? item?.produto : {};
+          if (!obj?.id) continue;
+          await produtoTinyRepository.update(obj?.id, obj);
+        }
+        if (response?.length < MAX_RECORDS) break;
+      }
     }
   }
 }
@@ -154,6 +194,7 @@ async function modificarStatusEstoque(tenant) {
 }
 
 async function importarProdutoTinyByTenant(tenant) {
+  TMongo.close();
   let produtoTinyRepository = new ProdutoTinyRepository(
     await TMongo.connect(),
     tenant.id_tenant
@@ -169,6 +210,9 @@ async function importarProdutoTinyByTenant(tenant) {
   let result = await tiny.post("produtos.pesquisa.php", data);
   let page_count = result?.data?.retorno?.numero_paginas;
 
+  //Sim apago todos os registros --- Muito mais rapido
+  await produtoTinyRepository.deleteMany({ id_tenant: tenant.id_tenant });
+
   let response;
   for (let page = page_count; page > 0; page--) {
     data = [
@@ -180,7 +224,14 @@ async function importarProdutoTinyByTenant(tenant) {
 
     for (let t = 1; t < 5; t++) {
       console.log(
-        "Tentativa: " + t + "  Paginas: " + page_count + " de " + page
+        tenant.id_tenant +
+          ">>" +
+          "Tentativa: " +
+          t +
+          "  Paginas: " +
+          page_count +
+          " de " +
+          page
       );
       result = await tiny.post("produtos.pesquisa.php", data);
       response = await tiny.tratarRetorno(result, "produtos");
@@ -189,11 +240,16 @@ async function importarProdutoTinyByTenant(tenant) {
     }
 
     if (!Array.isArray(response)) continue;
+    let items = [];
+
     for (let item of response) {
       let obj = item?.produto ? item?.produto : {};
       if (!obj?.id) continue;
-      await produtoTinyRepository.update(obj.id, obj);
+      obj.id_tenant = tenant.id_tenant;
+      obj.updated_at = new Date();
+      items.push(obj);
     }
+    await produtoTinyRepository.insertMany(items);
   }
 }
 
@@ -220,15 +276,22 @@ async function obterProdutoEstoque(tiny, id) {
   return response;
 }
 
-async function produtoPesquisaByDataCriacao(tenant, dataCriacao) {
-  const data = [{ key: "dataCriacao", value: dataCriacao }];
+async function produtoPesquisaByDataCriacao(tenant, dataCriacao, page = 1) {
+  const data = [
+    { key: "dataCriacao", value: dataCriacao },
+    { key: "pagina", value: page ? page : 1 },
+  ];
   let response = null;
-
   const tiny = new Tiny({ token: tenant.token });
   tiny.setTimeout(1000 * 10);
 
   for (let t = 1; t < 5; t++) {
     response = await tiny.post("produtos.pesquisa.php", data);
+    if (response?.data?.retorno?.codigo_erro == 20) {
+      console.log("A consulta não retornou registros");
+      response = null;
+      break;
+    }
     response = await tiny.tratarRetorno(response, "produtos");
     if (tiny.status() == "OK") break;
     response = null;
@@ -311,7 +374,6 @@ async function processarEstoqueByTenant(tenant) {
 
 const AnuncioController = {
   init,
-  importarProdutoTinyDiario,
 };
 
 export { AnuncioController };
