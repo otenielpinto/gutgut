@@ -26,7 +26,6 @@ class ProdutoTinyRepository {
     if (!payload.sys_status) payload.sys_status = 200; //sempre que for atualizar o produto no tiny, o sys_status deve ser 200
     if (!payload.sys_estoque) payload.sys_estoque = 0;
 
-
     const result = await this.db
       .collection(collection)
       .updateOne(
@@ -53,7 +52,6 @@ class ProdutoTinyRepository {
     return result?.modifiedCount > 0;
   }
 
-
   //essa funcao atualiza o estoque do produto pelo codigo numerico -- existem casos que o codigo do produto no tiny é diferente do codigo do produto no estoque
   async updateBySysCodigo(codigo, payload) {
     //  { upsert: false }   -- Nao cadastrar  nada se nao encontrar
@@ -71,9 +69,6 @@ class ProdutoTinyRepository {
     return result?.modifiedCount > 0;
   }
 
-
-
-
   async delete(id) {
     const result = await this.db
       .collection(collection)
@@ -89,6 +84,12 @@ class ProdutoTinyRepository {
     return await this.db
       .collection(collection)
       .findOne({ id: String(id), id_tenant: this.id_tenant });
+  }
+
+  async findByCodigo(codigo) {
+    return await this.db
+      .collection(collection)
+      .findOne({ codigo: String(codigo), id_tenant: this.id_tenant });
   }
 
   async insertMany(items) {

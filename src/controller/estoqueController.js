@@ -10,7 +10,6 @@ async function init() {
   //fazer uma atualizacao dos status =500  e tambem de todos que estão situacao =0
 }
 
-
 //idProduto = id Tiny do Produto
 async function produtoAtualizarEstoque(token, id_produto, quantity) {
   let date = new Date();
@@ -39,7 +38,9 @@ async function produtoAtualizarEstoque(token, id_produto, quantity) {
   const data = [{ key: "estoque", value: { estoque } }];
 
   for (let t = 1; t < 5; t++) {
-    console.log("Atualizando estoque " + t + "/5  " + id_produto + ' qtd: ' + quantity);
+    console.log(
+      "Atualizando estoque " + t + "/5  " + id_produto + " qtd: " + quantity
+    );
     response = await tiny.post("produto.atualizar.estoque.php", data);
     response = await tiny.tratarRetorno(response, "registros");
     if (tiny.status() == "OK") return response;
@@ -55,8 +56,8 @@ async function atualizarPrecosLote(tenant, produtos) {
   let response = null;
 
   let obj = {
-    precos: produtos
-  }
+    precos: produtos,
+  };
   const data = [{ key: "data", value: obj }];
 
   for (let t = 1; t < 5; t++) {
@@ -69,14 +70,13 @@ async function atualizarPrecosLote(tenant, produtos) {
   return response;
 }
 
-
 async function zerarEstoqueGeral(tenant) {
   let c = await TMongo.connect();
   let produtoTinyRepository = new ProdutoTinyRepository(c, tenant.id_tenant);
   let criterio = {
     id_tenant: tenant.id_tenant,
     sys_status: 0,
-  }
+  };
 
   let rows = await produtoTinyRepository.findAll(criterio);
   for (let row of rows) {
@@ -88,8 +88,59 @@ async function zerarEstoqueGeral(tenant) {
   }
 }
 
+/*
+ Transfere estoque de uma empresa para outra
+ @TIPO = E - Entrada | S - Saida  B - Balanco
+*/
+async function transferir(token, id_produto, quantity, tipo, cod_empresa, doc) {
+  let date = new Date();
+  let hora = date.getHours(); // 0-23
+  let min = date.getMinutes(); // 0-59
+  let seg = date.getSeconds(); // 0-59
+  let minFmt = min;
+  let historico = "";
+  if (min < 10) minFmt = `0${min}`;
+  if (quantity < 0) quantity = 0;
+
+  if (tipo === "E") {
+    historico = `Transferencia recebida Nº ${doc} ${cod_empresa} `;
+  } else if (tipo === "S") {
+    historico = `Transferencia enviada Nº ${doc} ${cod_empresa} `;
+  } else historico = `Balanco estoque ${cod_empresa} `;
+
+  let obs =
+    `${historico}: ${quantity} as ` +
+    lib.formatDateBr(date) +
+    ` ${hora}:${minFmt}:${seg} by T7Ti `;
+
+  const estoque = {
+    idProduto: id_produto,
+    tipo: tipo,
+    observacoes: obs,
+    quantidade: quantity,
+  };
+
+  const tiny = new Tiny({ token: token });
+  tiny.setTimeout(1000 * 10);
+  let response = null;
+  const data = [{ key: "estoque", value: { estoque } }];
+
+  for (let t = 1; t < 5; t++) {
+    console.log(
+      "Atualizando estoque " + t + "/5  " + id_produto + " qtd: " + quantity
+    );
+    response = await tiny.post("produto.atualizar.estoque.php", data);
+    response = await tiny.tratarRetorno(response, "registros");
+    if (tiny.status() == "OK") return response;
+    response = null;
+  }
+
+  return response;
+}
+
 const estoqueController = {
   init,
+  transferir,
   produtoAtualizarEstoque,
   zerarEstoqueGeral,
   atualizarPrecosLote,

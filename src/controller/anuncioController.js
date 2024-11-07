@@ -16,8 +16,6 @@ var filterTiny = {
 async function init() {
   if (global.config_debug == 1) {
     return;
-    await atualizarEstoqueEcommerce();
-    return;
   }
 
   //importar mensalmente todos os produtos ( sincronização mensal )
@@ -28,6 +26,10 @@ async function init() {
 }
 
 async function importarProdutoTinyMensal() {
+  //Desativado porque isso pode gerar problemas de performance
+  //Apenas ajustar para validar os ultimos 30 dias de produtos
+  console.log("[DESATIVADO]Importar produtos mensalmente");
+  return;
   let tenants = await mpkIntegracaoController.findAll(filterTiny);
 
   let key = "importarProdutoTinyMensal";
@@ -47,13 +49,17 @@ async function importarProdutoTinyDiario() {
   let tenants = await mpkIntegracaoController.findAll(filterTiny);
   const c = await TMongo.connect();
   const MAX_RECORDS = 100;
+  let key = "importarProdutoTinyDiario_ultimos_7dias";
 
   for (let tenant of tenants) {
     let produtoTinyRepository = new ProdutoTinyRepository(c, tenant.id_tenant);
     let tiny = new Tiny({ token: tenant.token });
     let info = new TinyInfo({ instance: tiny });
 
-    for (let idx = 5; idx >= 0; idx--) {
+    let max_day = 7;
+    if ((await systemService.started(tenant.id_tenant, key)) == 1) max_day = 2; //apenas 2 dias
+
+    for (let idx = max_day; idx >= 0; idx--) {
       let desde = lib.formatDateBr(lib.addDays(new Date(), idx * -1));
       let pages = await info.getPaginasProdutosDataCriacao(desde);
       if (!pages || pages == 0) pages = 1;

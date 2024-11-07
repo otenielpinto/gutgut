@@ -1,6 +1,7 @@
 import { TMongo } from "./infra/mongoClient.js";
 import { lib } from "./utils/lib.js";
 import { AnuncioController } from "./controller/anuncioController.js";
+import { transferenciaController } from "./controller/transferenciaController.js";
 import nodeSchedule from "node-schedule";
 
 global.processandoNow = 0;
@@ -10,6 +11,7 @@ async function task() {
   //colocar aqui controller;
   await TMongo.close();
   await AnuncioController.init();
+  await transferenciaController.init();
 
   global.processandoNow = 0;
   console.log(" Job finished - task " + lib.currentDateTimeStr());
@@ -20,7 +22,8 @@ async function init() {
   //Espaço reserva para testes ;
   global.config_debug = 0; // 1 - debug | 0 - producao
 
-  // await AnuncioController.init();
+  //await AnuncioController.init();
+  // await transferenciaController.init();
   // return;
 
   if (global.config_debug == 1) {
