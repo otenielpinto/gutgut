@@ -8,6 +8,7 @@ import { estoqueController } from "./estoqueController.js";
 import { marketplaceTypes } from "../types/marketplaceTypes.js";
 import { systemService } from "../services/systemService.js";
 import { mpkIntegracaoController } from "./mpkIntegracaoController.js";
+import { MigrateRepository } from "../repository/migrateRepository.js";
 
 var filterTiny = {
   id_mktplace: marketplaceTypes.tiny,
@@ -37,10 +38,14 @@ async function migrateProdutosTinyLojaMeier() {
   }
 
   TMongo.close();
-  let produtoTinyRepository = new ProdutoTinyRepository(
-    await TMongo.connect(),
-    tenant.id_tenant
-  );
+  const c = await TMongo.connect();
+  let produtoTinyRepository = new ProdutoTinyRepository(c, tenant.id_tenant);
+  let migrateRepository = new MigrateRepository(c);
+  let migrate = await migrateRepository.findById(500);
+  if (!migrate) {
+    await migrateRepository.create({ id: 500, recno: 1 });
+    migrate = await migrateRepository.findById(500);
+  }
 
   const token_meier =
     "76ae1b6a8089417a2371bf17196c665f907ed9495b62a81167fdc3c0ce35785c";
@@ -66,7 +71,7 @@ async function migrateProdutosTinyLojaMeier() {
   const PRECO_PADRAO = "99999.99";
   let preco = 0;
   let preco_variacao = 0;
-  let start_recno = 418;
+  let start_recno = migrate.recno ? migrate.recno : 1;
 
   console.log("Total de produtos: ", total_produtos);
   for (let produto of produtos) {
@@ -128,6 +133,7 @@ async function migrateProdutosTinyLojaMeier() {
       lote = [];
       console.log("Produto inserido-->: ", JSON.stringify(result));
     }
+    await migrateRepository.update(500, { id: 500, recno: recno });
   }
 }
 
