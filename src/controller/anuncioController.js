@@ -72,6 +72,7 @@ async function migrateProdutosTinyLojaMeier() {
   let preco = 0;
   let preco_variacao = 0;
   let start_recno = migrate.recno ? migrate.recno : 1;
+  //start_recno = 450;
 
   console.log("Total de produtos: ", total_produtos);
   for (let produto of produtos) {
@@ -111,24 +112,40 @@ async function migrateProdutosTinyLojaMeier() {
 
     if (lote.length == max_lote) {
       console.log("Inserindo lote de produtos");
-      for (let t = 1; t < 5; t++) {
+      let stop = 0;
+      for (let t = 1; t < max_tentativas; t++) {
         console.log("Inserindo Produto" + "Tentativa: " + t);
         data = [{ key: "produto", value: { produtos: lote } }];
         response = await tiny_meier.post("produto.incluir.php", data);
         result = await tiny_meier.tratarRetorno(response, "registros");
         if (tiny_meier.status() == "OK") break;
-      }
+        let registros = result?.retorno?.registros;
 
-      if (result?.retorno?.status == "Erro") {
+        stop = 0;
+        if (Array.isArray(registros)) {
+          for (let r of registros) {
+            let erros = r?.registro?.erros;
+            if (!Array.isArray(erros)) continue;
+            for (let e of erros) {
+              if (
+                e?.erro ==
+                "Registro em duplicidade - nome do produto já cadastrado"
+              ) {
+                stop = 1;
+                break;
+              }
+            }
+          }
+        }
+        if (stop == 1) break;
+
         for (let item of lote) {
+          console.log("***************************************");
           console.log(item.produto.nome);
+          console.log("***************************************");
           item.produto.descricao_complementar = "";
         }
-        data = [{ key: "produto", value: { produtos: lote } }];
-        response = await tiny_meier.post("produto.incluir.php", data);
-        result = await tiny_meier.tratarRetorno(response, "registros");
       }
-
       sequencia = 1;
       lote = [];
       console.log("Produto inserido-->: ", JSON.stringify(result));
