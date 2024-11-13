@@ -24,7 +24,8 @@ async function init() {
 
   //await AnuncioController.init();
   // await transferenciaController.init();
-  // return;
+  await AnuncioController.migrateProdutosTinyLojaMeier();
+  return;
 
   if (global.config_debug == 1) {
     await AnuncioController.init();

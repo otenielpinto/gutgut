@@ -25,6 +25,112 @@ async function init() {
   await importarProdutoTinyDiario();
 }
 
+async function migrateProdutosTinyLojaMeier() {
+  let tenants = await mpkIntegracaoController.findAll(filterTiny);
+  let tenant = null;
+  for (let x of tenants) {
+    if (x.id == 1) tenant = x;
+  }
+  if (tenant.id != 1) {
+    console.log("Empresa não encontrada");
+    return;
+  }
+
+  TMongo.close();
+  let produtoTinyRepository = new ProdutoTinyRepository(
+    await TMongo.connect(),
+    tenant.id_tenant
+  );
+
+  const token_meier =
+    "76ae1b6a8089417a2371bf17196c665f907ed9495b62a81167fdc3c0ce35785c";
+  const tiny_meier = new Tiny({ token: token_meier });
+  tiny_meier.setTimeout(1000 * 10);
+
+  const tiny = new Tiny({ token: tenant.token });
+  tiny.setTimeout(1000 * 10);
+
+  let produtos = await produtoTinyRepository.findAll({
+    id_tenant: tenant.id_tenant,
+    tipoVariacao: "P",
+  });
+
+  let max_lote = 1;
+  let response = null;
+  let result = null;
+  let lote = [];
+  let sequencia = 1;
+  let recno = 1;
+  const max_tentativas = 10;
+  let total_produtos = produtos.length;
+  const PRECO_PADRAO = "99999.99";
+  let preco = 0;
+  let preco_variacao = 0;
+  let start_recno = 418;
+
+  console.log("Total de produtos: ", total_produtos);
+  for (let produto of produtos) {
+    console.log("Produto: ", recno++, " de ", total_produtos);
+    if (recno < start_recno) continue;
+    let data = [{ key: "id", value: produto.id }];
+
+    response = null;
+    for (let t = 1; t < max_tentativas; t++) {
+      console.log(tenant.id_tenant + ">>" + "Tentativa: " + t);
+      result = await tiny.post("produto.obter.php", data);
+      response = await tiny.tratarRetorno(result, "produto");
+      if (tiny.status() == "OK") break;
+      response = null;
+    }
+
+    if (!response) continue;
+
+    delete response.id;
+    let variacoes = [];
+    preco_variacao = "0.0";
+    for (let v of response.variacoes) {
+      if (!v.variacao) continue;
+      delete v.variacao.id;
+      preco_variacao = Number(v?.variacao?.preco);
+      variacoes.push(v);
+    }
+    response.variacoes = variacoes;
+    response.sequencia = String(sequencia++);
+    if (!response.unidade) response.unidade = "PC";
+    preco = Number(response?.preco);
+    if (preco == 0) response.preco = preco_variacao;
+    if (preco == 0) response.preco = PRECO_PADRAO;
+
+    let payload = { produto: response };
+    lote.push(payload);
+
+    if (lote.length == max_lote) {
+      console.log("Inserindo lote de produtos");
+      for (let t = 1; t < 5; t++) {
+        console.log("Inserindo Produto" + "Tentativa: " + t);
+        data = [{ key: "produto", value: { produtos: lote } }];
+        response = await tiny_meier.post("produto.incluir.php", data);
+        result = await tiny_meier.tratarRetorno(response, "registros");
+        if (tiny_meier.status() == "OK") break;
+      }
+
+      if (result?.retorno?.status == "Erro") {
+        for (let item of lote) {
+          console.log(item.produto.nome);
+          item.produto.descricao_complementar = "";
+        }
+        data = [{ key: "produto", value: { produtos: lote } }];
+        response = await tiny_meier.post("produto.incluir.php", data);
+        result = await tiny_meier.tratarRetorno(response, "registros");
+      }
+
+      sequencia = 1;
+      lote = [];
+      console.log("Produto inserido-->: ", JSON.stringify(result));
+    }
+  }
+}
+
 async function importarProdutoTinyMensal() {
   //Desativado porque isso pode gerar problemas de performance
   //Apenas ajustar para validar os ultimos 30 dias de produtos
@@ -217,7 +323,7 @@ async function importarProdutoTinyByTenant(tenant) {
   let page_count = result?.data?.retorno?.numero_paginas;
 
   //Sim apago todos os registros --- Muito mais rapido
-  await produtoTinyRepository.deleteMany({ id_tenant: tenant.id_tenant });
+  //await produtoTinyRepository.deleteMany({ id_tenant: tenant.id_tenant });
 
   let response;
   for (let page = page_count; page > 0; page--) {
@@ -380,6 +486,7 @@ async function processarEstoqueByTenant(tenant) {
 
 const AnuncioController = {
   init,
+  migrateProdutosTinyLojaMeier,
 };
 
 export { AnuncioController };

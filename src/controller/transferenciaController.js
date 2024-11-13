@@ -8,8 +8,10 @@ import { lib } from "../utils/lib.js";
 
 const STATUS_CONFIRMADO = "Confirmado";
 const STATUS_CONCLUIDO = "Concluido";
+const STATUS_PENDENTE = "Pendente";
 const STATUS_ERRO = "Erro";
 const SUB_STATUS_PROCESSANDO = "Processando";
+const SUB_STATUS_PROCESSADO_ESTOQUE = "Processado_estoque";
 
 async function init() {
   await processarTransferenciaConfirmada();
@@ -125,6 +127,7 @@ async function processarEstoque() {
               id: item?.id_saida,
               status: "Concluido",
               response: ts,
+              created_at: new Date(),
             });
           }
         } catch (error) {
@@ -151,6 +154,7 @@ async function processarEstoque() {
               id: item?.id_entrada,
               status: "Concluido",
               response: te,
+              created_at: new Date(),
             });
           }
         } catch (error) {
@@ -161,8 +165,8 @@ async function processarEstoque() {
       //******************************************************************************************* */
       item.status = status;
     }
-    row.sub_status = "Processado_estoque";
-    row.status = "Concluido";
+    row.sub_status = SUB_STATUS_PROCESSADO_ESTOQUE;
+    row.status = STATUS_CONCLUIDO;
     repository.update(row.id, row);
   }
 }
