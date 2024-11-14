@@ -213,8 +213,12 @@ async function migrateProdutosTinyLojaMeier() {
     }
 
     await migrateRepository.update(500, { id: 500, recno: recno });
-    // console.log("Pausing for 10 seconds");
-    // await lib.sleep(1000 * 11);
+
+    let tempo = 0;
+    while (tempo++ < 15) {
+      console.log("Contagem do Tempo: ", tempo);
+      await lib.sleep(900 * 1);
+    }
   }
 }
 
