@@ -26,14 +26,16 @@ async function init() {
   await importarProdutoTinyDiario();
 }
 
-async function produtoDuplicationCheck(registros) {
+async function produtoDuplicationCheck(result) {
   let stop = 0;
+  let registros = result?.retorno?.registros;
 
   if (Array.isArray(registros)) {
     for (let r of registros) {
       let erros = r?.registro?.erros;
       if (!Array.isArray(erros)) continue;
       for (let e of erros) {
+        console.log("Erro: ", e?.erro);
         if (
           e?.erro ==
             "Registro em duplicidade - nome do produto já cadastrado" ||
@@ -43,9 +45,36 @@ async function produtoDuplicationCheck(registros) {
           stop = 1;
           break;
         }
+
+        if (e?.erro == "ERRO JSON mal formado ou inválido") {
+          stop = 10;
+          break;
+        }
       }
     }
   }
+
+  if (stop == 0) {
+    let erros = result?.retorno?.erros;
+    if (!Array.isArray(erros)) return stop;
+    for (let e of erros) {
+      console.log("Erro: ", e?.erro);
+      if (
+        e?.erro == "Registro em duplicidade - nome do produto já cadastrado" ||
+        e?.erro ==
+          "Registro em duplicidade - código (SKU) do produto já cadastrado"
+      ) {
+        stop = 1;
+        break;
+      }
+
+      if (e?.erro == "ERRO JSON mal formado ou inválido") {
+        stop = 10;
+        break;
+      }
+    }
+  }
+
   return stop;
 }
 
@@ -96,7 +125,7 @@ async function migrateProdutosTinyLojaMeier() {
   let preco_variacao = 0;
   let start_recno = migrate.recno ? migrate.recno : 1;
   let errorCount = 0;
-  //start_recno = 752;
+  //start_recno = 774;
 
   console.log("Total de produtos: ", total_produtos);
   for (let produto of produtos) {
@@ -116,6 +145,9 @@ async function migrateProdutosTinyLojaMeier() {
     if (!response) continue;
 
     delete response.id;
+    if (response.id_fornecedor) delete response.id_fornecedor;
+    if (response.nome_fornecedor) delete response.nome_fornecedor;
+
     let variacoes = [];
     preco_variacao = "0.0";
     for (let v of response.variacoes) {
@@ -136,27 +168,32 @@ async function migrateProdutosTinyLojaMeier() {
 
     if (lote.length == max_lote) {
       let stop = 0;
+      let remove_descricao_complementar = 1;
+      tiny_meier.setTimeout(1000 * 1);
       for (let t = 1; t < max_tentativas; t++) {
-        console.log("Inserindo Produto" + " Tentativa: " + t);
+        console.log("Tentativa: " + t + " de " + max_tentativas);
+        if (t > 1) tiny_meier.setTimeout(1000 * 12);
         data = [{ key: "produto", value: { produtos: lote } }];
         response = await tiny_meier.post("produto.incluir.php", data);
         result = await tiny_meier.tratarRetorno(response, "registros");
         if (tiny_meier.status() == "OK") break;
-        let registros = result?.retorno?.registros;
 
-        stop = await produtoDuplicationCheck(registros);
+        stop = await produtoDuplicationCheck(result);
         if (stop == 1) {
           console.log("***************************************");
+          console.log(" J A   E X I S T E   N O   T I N Y ");
           console.log(produto?.nome);
           console.log("***************************************");
           break;
         }
 
-        for (let item of lote) {
-          console.log("***************************************");
-          console.log(item.produto.nome);
-          console.log("***************************************");
-          item.produto.descricao_complementar = "";
+        if (stop == 10) {
+          remove_descricao_complementar++;
+          console.log(JSON.stringify(lote));
+          for (let item of lote) {
+            item.produto.descricao_complementar = "";
+          }
+          if (remove_descricao_complementar > 1) break;
         }
         errorCount++;
         if (errorCount > 100) {
