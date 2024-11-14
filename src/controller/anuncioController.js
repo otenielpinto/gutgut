@@ -112,7 +112,7 @@ async function migrateProdutosTinyLojaMeier() {
     tipoVariacao: "P",
   });
 
-  let max_lote = 1;
+  let max_lote = 2;
   let response = null;
   let result = null;
   let lote = [];
@@ -124,7 +124,7 @@ async function migrateProdutosTinyLojaMeier() {
   let preco = 0;
   let preco_variacao = 0;
   let start_recno = migrate.recno ? migrate.recno : 1;
-  let errorCount = 0;
+
   //start_recno = 774;
 
   console.log("Total de produtos: ", total_produtos);
@@ -183,6 +183,17 @@ async function migrateProdutosTinyLojaMeier() {
         result = await tiny_meier.tratarRetorno(response, "registros");
         if (tiny_meier.status() == "OK") break;
 
+        if (!result) {
+          for (let l of lote) {
+            console.log("Enviando por unidade " + l.produto.nome);
+            l.produto.descricao_complementar = "";
+            l.produto.nome_fornecedor = "";
+            data = [{ key: "produto", value: { produtos: [l] } }];
+            response = await tiny_meier.post("produto.incluir.php", data);
+            result = await tiny_meier.tratarRetorno(response, "registros");
+          }
+        }
+
         stop = await produtoDuplicationCheck(result);
         if (stop == 1) {
           console.log("***************************************");
@@ -194,17 +205,11 @@ async function migrateProdutosTinyLojaMeier() {
 
         if (stop == 10) {
           remove_descricao_complementar++;
-          console.log(JSON.stringify(lote));
           for (let item of lote) {
             item.produto.descricao_complementar = "";
+            item.produto.nome_fornecedor = "";
           }
           if (remove_descricao_complementar > 1) break;
-        }
-        errorCount++;
-        if (errorCount > 100) {
-          errorCount = 0;
-          console.log("Parando momentaneamente");
-          await lib.sleep(1000 * 36);
         }
       }
       sequencia = 1;
@@ -215,9 +220,11 @@ async function migrateProdutosTinyLojaMeier() {
     await migrateRepository.update(500, { id: 500, recno: recno });
 
     let tempo = 0;
+    if (lote.length > 0) continue;
+
     while (tempo++ < 15) {
       console.log("Contagem do Tempo: ", tempo);
-      await lib.sleep(900 * 1);
+      await lib.sleep(800 * 1);
     }
   }
 }
