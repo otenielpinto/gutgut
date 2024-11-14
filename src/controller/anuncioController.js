@@ -70,7 +70,7 @@ async function migrateProdutosTinyLojaMeier() {
   const token_meier =
     "76ae1b6a8089417a2371bf17196c665f907ed9495b62a81167fdc3c0ce35785c";
   const tiny_meier = new Tiny({ token: token_meier });
-  tiny_meier.setTimeout(1000 * 10);
+  tiny_meier.setTimeout(1000 * 12);
 
   const tiny = new Tiny({ token: tenant.token });
   tiny.setTimeout(1000 * 10);
@@ -142,7 +142,10 @@ async function migrateProdutosTinyLojaMeier() {
         let registros = result?.retorno?.registros;
 
         stop = await produtoDuplicationCheck(registros);
-        if (stop == 1) break;
+        if (stop == 1) {
+          console.log("Produto duplicado " + produto?.nome);
+          break;
+        }
 
         for (let item of lote) {
           console.log("***************************************");
@@ -153,7 +156,8 @@ async function migrateProdutosTinyLojaMeier() {
         errorCount++;
         if (errorCount > 100) {
           errorCount = 0;
-          await lib.sleep(1000 * 30);
+          console.log("Parando momentaneamente");
+          await lib.sleep(1000 * 36);
         }
       }
       sequencia = 1;
@@ -161,6 +165,7 @@ async function migrateProdutosTinyLojaMeier() {
       console.log("Produto inserido-->: ", JSON.stringify(result));
     }
     await migrateRepository.update(500, { id: 500, recno: recno });
+    await lib.sleep(1000 * 4);
   }
 }
 
