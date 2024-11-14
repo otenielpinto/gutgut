@@ -165,7 +165,8 @@ async function migrateProdutosTinyLojaMeier() {
       console.log("Produto inserido-->: ", JSON.stringify(result));
     }
     await migrateRepository.update(500, { id: 500, recno: recno });
-    await lib.sleep(1000 * 4);
+    console.log("Pausing for 10 seconds");
+    await lib.sleep(1000 * 11);
   }
 }
 
