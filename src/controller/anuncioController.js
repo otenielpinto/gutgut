@@ -35,7 +35,10 @@ async function produtoDuplicationCheck(registros) {
       if (!Array.isArray(erros)) continue;
       for (let e of erros) {
         if (
-          e?.erro == "Registro em duplicidade - nome do produto já cadastrado"
+          e?.erro ==
+            "Registro em duplicidade - nome do produto já cadastrado" ||
+          e?.erro ==
+            "Registro em duplicidade - código (SKU) do produto já cadastrado"
         ) {
           stop = 1;
           break;
@@ -93,7 +96,7 @@ async function migrateProdutosTinyLojaMeier() {
   let preco_variacao = 0;
   let start_recno = migrate.recno ? migrate.recno : 1;
   let errorCount = 0;
-  //start_recno = 450;
+  //start_recno = 752;
 
   console.log("Total de produtos: ", total_produtos);
   for (let produto of produtos) {
@@ -143,7 +146,9 @@ async function migrateProdutosTinyLojaMeier() {
 
         stop = await produtoDuplicationCheck(registros);
         if (stop == 1) {
-          console.log("Produto duplicado " + produto?.nome);
+          console.log("***************************************");
+          console.log(produto?.nome);
+          console.log("***************************************");
           break;
         }
 
@@ -164,9 +169,10 @@ async function migrateProdutosTinyLojaMeier() {
       lote = [];
       console.log("Produto inserido-->: ", JSON.stringify(result));
     }
+
     await migrateRepository.update(500, { id: 500, recno: recno });
-    console.log("Pausing for 10 seconds");
-    await lib.sleep(1000 * 11);
+    // console.log("Pausing for 10 seconds");
+    // await lib.sleep(1000 * 11);
   }
 }
 
