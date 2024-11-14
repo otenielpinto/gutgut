@@ -145,8 +145,13 @@ async function migrateProdutosTinyLojaMeier() {
     if (!response) continue;
 
     delete response.id;
+    let nome_fornecedor = response.nome_fornecedor
+      ? response.nome_fornecedor
+      : "";
     if (response.id_fornecedor) delete response.id_fornecedor;
-    if (response.nome_fornecedor) delete response.nome_fornecedor;
+    if (response.nome_fornecedor) {
+      response.nome_fornecedor = nome_fornecedor.replace(/[&?]/g, "");
+    }
 
     let variacoes = [];
     preco_variacao = "0.0";
