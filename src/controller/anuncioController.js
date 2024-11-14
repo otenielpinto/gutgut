@@ -109,7 +109,7 @@ async function migrateProdutosTinyLojaMeier() {
 
   let produtos = await produtoTinyRepository.findAll({
     id_tenant: tenant.id_tenant,
-    tipoVariacao: "P",
+    tipoVariacao: "N",
   });
 
   let max_lote = 2;
@@ -214,7 +214,7 @@ async function migrateProdutosTinyLojaMeier() {
       }
       sequencia = 1;
       lote = [];
-      console.log("Produto inserido-->: ", JSON.stringify(result));
+      console.log("Produto inserido ==>>: ", JSON.stringify(result));
     }
 
     await migrateRepository.update(500, { id: 500, recno: recno });
@@ -222,9 +222,9 @@ async function migrateProdutosTinyLojaMeier() {
     let tempo = 0;
     if (lote.length > 0) continue;
 
-    while (tempo++ < 15) {
+    while (tempo++ < 10) {
       console.log("Contagem do Tempo: ", tempo);
-      await lib.sleep(800 * 1);
+      await lib.sleep(900 * 1);
     }
   }
 }
