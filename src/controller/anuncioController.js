@@ -81,11 +81,17 @@ async function produtoDuplicationCheck(result) {
 async function migrateProdutosTinyLojaMeier() {
   let tenants = await mpkIntegracaoController.findAll(filterTiny);
   let tenant = null;
+  let token_meier = null;
   for (let x of tenants) {
     if (x.id == 1) tenant = x;
+    if (x.id == 8) token_meier = x.token;
   }
   if (tenant.id != 1) {
     console.log("Empresa não encontrada");
+    return;
+  }
+  if (!token_meier) {
+    console.log("Token do Meier não encontrado");
     return;
   }
 
@@ -99,18 +105,38 @@ async function migrateProdutosTinyLojaMeier() {
     migrate = await migrateRepository.findById(500);
   }
 
-  const token_meier =
-    "76ae1b6a8089417a2371bf17196c665f907ed9495b62a81167fdc3c0ce35785c";
   const tiny_meier = new Tiny({ token: token_meier });
   tiny_meier.setTimeout(1000 * 12);
 
   const tiny = new Tiny({ token: tenant.token });
   tiny.setTimeout(1000 * 10);
 
-  let produtos = await produtoTinyRepository.findAll({
+  let produtos = [];
+  console.log(" buscar produtos do galpao");
+  let galpao = await produtoTinyRepository.findAll({
     id_tenant: tenant.id_tenant,
-    tipoVariacao: "N",
   });
+
+  console.log(" buscar produtos do meier");
+  let meier = await produtoTinyRepository.findAll({
+    id_tenant: 8,
+  });
+
+  let existentes = [];
+  for (let m of meier) {
+    if (!m.codigo || m.codigo == "" || m.codigo == null) continue;
+    existentes.push(m.codigo);
+  }
+  meier = null;
+  for (let g of galpao) {
+    if (!g.codigo || g.codigo == "" || g.codigo == null) continue;
+    if (existentes.includes(g.codigo)) continue;
+    existentes.push(g.codigo);
+    produtos.push(g);
+  }
+  galpao = null;
+
+  //tipoVariacao: "P",
 
   let max_lote = 2;
   let response = null;
@@ -232,12 +258,16 @@ async function migrateProdutosTinyLojaMeier() {
 async function importarProdutoTinyMensal() {
   //Desativado porque isso pode gerar problemas de performance
   //Apenas ajustar para validar os ultimos 30 dias de produtos
-  console.log("[DESATIVADO]Importar produtos mensalmente");
-  return;
+  // console.log("[DESATIVADO]Importar produtos mensalmente");
+  //return;
+  const loja_meier = 8;
   let tenants = await mpkIntegracaoController.findAll(filterTiny);
-
   let key = "importarProdutoTinyMensal";
   for (let tenant of tenants) {
+    //meier
+    if (tenant.id_tenant !== loja_meier) continue;
+    await importarProdutoTinyByTenant(tenant);
+
     if ((await systemService.monthlyTaskExecuted(tenant.id_tenant, key)) == 1)
       continue;
     try {
@@ -459,7 +489,13 @@ async function importarProdutoTinyByTenant(tenant) {
       obj.updated_at = new Date();
       items.push(obj);
     }
-    await produtoTinyRepository.insertMany(items);
+    for (let item of items) {
+      console.log("Produto: ", item.id);
+      await produtoTinyRepository.update(item.id, item);
+    }
+    await lib.sleep(1000 * 2);
+
+    //await produtoTinyRepository.insertMany(items);
   }
 }
 
@@ -585,6 +621,7 @@ async function processarEstoqueByTenant(tenant) {
 const AnuncioController = {
   init,
   migrateProdutosTinyLojaMeier,
+  importarProdutoTinyMensal,
 };
 
 export { AnuncioController };
