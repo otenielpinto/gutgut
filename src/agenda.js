@@ -24,14 +24,13 @@ async function init() {
 
   //await AnuncioController.init();
   // await transferenciaController.init();
-  await AnuncioController.migrateProdutosTinyLojaMeier();
+  //await AnuncioController.migrateProdutosTinyLojaMeier();
   //await AnuncioController.importarProdutoTinyMensal();
-  return;
 
-  if (global.config_debug == 1) {
-    await AnuncioController.init();
-    return;
-  }
+  // if (global.config_debug == 1) {
+  //   await AnuncioController.init();
+  //   return;
+  // }
 
   try {
     let time = process.env.CRON_JOB_TIME || 10; //tempo em minutos

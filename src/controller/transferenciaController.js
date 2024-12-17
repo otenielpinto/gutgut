@@ -1,8 +1,10 @@
 import { TransferenciaRepository } from "../repository/transferenciaRepository.js";
+import { TransferenciaFilaRepository } from "../repository/transferenciaFilaRepository.js";
 import { ProdutoTinyRepository } from "../repository/produtoTinyRepository.js";
 import { MpkIntegracaoRepository } from "../repository/mpkIntegracaoRepository.js";
 import { TransferenciaMovtoRepository } from "../repository/transferenciaMovtoRepository.js";
 import { estoqueController } from "./estoqueController.js";
+
 import { TMongo } from "../infra/mongoClient.js";
 import { lib } from "../utils/lib.js";
 
@@ -49,14 +51,16 @@ async function processarTransferenciaConfirmada() {
           item_nao_conformidade = 1;
         }
         item.to_id_product = produto_tiny_loja_destino?.id;
-        item.id_entrada = await lib.newUUId();
-        item.id_saida = await lib.newUUId();
+        if (!item.id_entrada || item?.id_entrada == null)
+          item.id_entrada = await lib.newUUId();
+        if (!item.id_saida || item?.id_saida == null)
+          item.id_saida = await lib.newUUId();
         item.nao_conformidade = item_nao_conformidade;
       }
 
       row.sub_status = SUB_STATUS_PROCESSANDO;
       row.nao_conformidade = nao_conformidade;
-      repository.update(row.id, row);
+      await repository.update(row.id, row);
     }
   }
   await TMongo.disconnect();
@@ -65,11 +69,14 @@ async function processarTransferenciaConfirmada() {
 async function processarEstoque() {
   const c = await TMongo.connect();
   const transferenciaMovto = new TransferenciaMovtoRepository(c);
+  const fila = new TransferenciaFilaRepository(c);
   let repository = new TransferenciaRepository(c);
   let mpkIntegracao = new MpkIntegracaoRepository(c);
   let empresas = await mpkIntegracao.findAll({});
   let empresa_from = null;
   let empresa_to = null;
+  let item_code = null;
+  let cod_transf = null;
 
   let rows = await repository.findAll({
     status: STATUS_CONFIRMADO,
@@ -84,7 +91,14 @@ async function processarEstoque() {
     let items = row.items;
     empresa_from = null;
     empresa_to = null;
+    cod_transf = row?.id;
     let doc = row?.id;
+    let obj = await fila.findById(cod_transf);
+
+    if (obj) {
+      console.log(`Transferencia já processada: ${cod_transf}`);
+      continue;
+    }
 
     //localizar a empresa de origem , tive problemas o find não funcionou
     for (let e of empresas) {
@@ -104,6 +118,7 @@ async function processarEstoque() {
 
     for (const item of items) {
       if (!item?.id_entrada || !item?.id_saida) continue;
+      item_code = item?.code;
 
       let saida = await transferenciaMovto.findById(item?.id_saida);
       let entrada = await transferenciaMovto.findById(item?.id_entrada);
@@ -125,6 +140,8 @@ async function processarEstoque() {
           if (ts) {
             await transferenciaMovto.create({
               id: item?.id_saida,
+              id_produto: item_code,
+              id_transferencia: cod_transf,
               status: "Concluido",
               response: ts,
               created_at: new Date(),
@@ -152,6 +169,8 @@ async function processarEstoque() {
           if (te) {
             await transferenciaMovto.create({
               id: item?.id_entrada,
+              id_produto: item_code,
+              id_transferencia: cod_transf,
               status: "Concluido",
               response: te,
               created_at: new Date(),
@@ -167,7 +186,8 @@ async function processarEstoque() {
     }
     row.sub_status = SUB_STATUS_PROCESSADO_ESTOQUE;
     row.status = STATUS_CONCLUIDO;
-    repository.update(row.id, row);
+    await repository.update(row.id, row);
+    await fila.create({ id: cod_transf, created_at: new Date() });
   }
 }
 

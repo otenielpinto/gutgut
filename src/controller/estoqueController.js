@@ -127,14 +127,13 @@ async function transferir(token, id_produto, quantity, tipo, cod_empresa, doc) {
 
   for (let t = 1; t < 5; t++) {
     console.log(
-      "Atualizando estoque " + t + "/5  " + id_produto + " qtd: " + quantity
+      "Transferindo estoque " + t + "/5  " + id_produto + " qtd: " + quantity
     );
     response = await tiny.post("produto.atualizar.estoque.php", data);
     response = await tiny.tratarRetorno(response, "registros");
     if (tiny.status() == "OK") return response;
     response = null;
   }
-
   return response;
 }
 
