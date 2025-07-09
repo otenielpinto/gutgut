@@ -92,6 +92,17 @@ class ProdutoTinyRepository {
       .findOne({ codigo: String(codigo), id_tenant: this.id_tenant });
   }
 
+  async findSemCodigo() {
+    return await this.db
+      .collection(collection)
+      .find({
+        $or: [{ codigo: { $exists: false } }, { codigo: null }, { codigo: "" }],
+        tipoVariacao: { $ne: "P" },
+        id_tenant: this.id_tenant,
+      })
+      .toArray();
+  }
+
   async insertMany(items) {
     if (!Array.isArray(items)) return null;
     try {

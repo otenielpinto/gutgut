@@ -14,9 +14,10 @@ export const tinyApi = async (apiUrl, data = [], method = "GET") => {
       contentData = qs.stringify({ xml: item.value });
     else params.append(item.key, item.value);
   }
+  let response = null;
 
   try {
-    const response = await axios({
+    response = await axios({
       method,
       url: `${base_url}${apiUrl}?${params.toString()}${body}`,
       data: contentData,

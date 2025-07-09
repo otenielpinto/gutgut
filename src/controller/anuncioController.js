@@ -386,6 +386,35 @@ async function processarEstoqueByTenant(tenant) {
   } //for produtos
 }
 
+async function relatorioProdutosSemCodigo() {
+  return; //vou executar diretamente no frontend
+  TMongo.close();
+  let tenants = await mpkIntegracaoController.findAll(filterTiny);
+  const c = await TMongo.connect();
+  let key = "relatorioProdutosSemCodigo";
+
+  for (let tenant of tenants) {
+    let produtoTinyRepository = new ProdutoTinyRepository(c, tenant.id_tenant);
+    //if ((await systemService.started(tenant.id_tenant, key)) == 1) continue;
+    let rows = await produtoTinyRepository.findSemCodigo();
+    if (!rows || rows.length == 0) {
+      console.log(
+        `Tenant ${tenant.id_tenant} - Não existem produtos sem código`
+      );
+      continue;
+    }
+    console.log(
+      `Tenant ${tenant.id_tenant} - Encontrados ${rows.length} produtos sem código`
+    );
+    for (let row of rows) {
+      console.log(
+        `Produto: ${row.id} - ${row.nome} - ${row.descricao} - ${row.tipoVariacao}`
+      );
+      await lib.sleep(1000 * 10); //para não travar o console
+    }
+  }
+}
+
 const AnuncioController = {
   init,
   importarProdutoTinyMensal,

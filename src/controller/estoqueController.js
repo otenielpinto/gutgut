@@ -92,7 +92,16 @@ async function zerarEstoqueGeral(tenant) {
  Transfere estoque de uma empresa para outra
  @TIPO = E - Entrada | S - Saida  B - Balanco
 */
-async function transferir(token, id_produto, quantity, tipo, cod_empresa, doc) {
+async function transferir(
+  token,
+  id_produto,
+  quantity,
+  tipo,
+  cod_empresa,
+  doc,
+  devolucao = null,
+  deposito = null
+) {
   let date = new Date();
   let hora = date.getHours(); // 0-23
   let min = date.getMinutes(); // 0-59
@@ -104,8 +113,14 @@ async function transferir(token, id_produto, quantity, tipo, cod_empresa, doc) {
 
   if (tipo === "E") {
     historico = `Transferencia recebida Nº ${doc} ${cod_empresa} `;
+    if (devolucao) {
+      historico = `Devolução recebida Nº ${doc} ${cod_empresa} `;
+    }
   } else if (tipo === "S") {
     historico = `Transferencia enviada Nº ${doc} ${cod_empresa} `;
+    if (devolucao) {
+      historico = `Devolução enviada Nº ${doc} ${cod_empresa} `;
+    }
   } else historico = `Balanco estoque ${cod_empresa} `;
 
   let obs =
@@ -120,6 +135,11 @@ async function transferir(token, id_produto, quantity, tipo, cod_empresa, doc) {
     quantidade: quantity,
   };
 
+  //nem sempre será informado o deposito
+  if (deposito) {
+    estoque.deposito = deposito;
+  }
+
   const tiny = new Tiny({ token: token });
   tiny.setTimeout(1000 * 10);
   let response = null;
@@ -127,7 +147,14 @@ async function transferir(token, id_produto, quantity, tipo, cod_empresa, doc) {
 
   for (let t = 1; t < 5; t++) {
     console.log(
-      "Transferindo estoque " + t + "/5  " + id_produto + " qtd: " + quantity
+      "Transferindo estoque " +
+        t +
+        "/5  " +
+        id_produto +
+        " qtd: " +
+        quantity +
+        " tipo: " +
+        tipo
     );
     response = await tiny.post("produto.atualizar.estoque.php", data);
     response = await tiny.tratarRetorno(response, "registros");

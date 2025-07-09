@@ -2,6 +2,7 @@ import { TMongo } from "./infra/mongoClient.js";
 import { lib } from "./utils/lib.js";
 import { AnuncioController } from "./controller/anuncioController.js";
 import { transferenciaController } from "./controller/transferenciaController.js";
+import { devolucaoController } from "./controller/devolucaoController.js";
 import nodeSchedule from "node-schedule";
 
 global.processandoNow = 0;
@@ -12,6 +13,7 @@ async function task() {
   await TMongo.close();
   await AnuncioController.init();
   await transferenciaController.init();
+  await devolucaoController.init();
 
   global.processandoNow = 0;
   console.log(" Job finished - task " + lib.currentDateTimeStr());
@@ -23,14 +25,10 @@ async function init() {
   global.config_debug = 0; // 1 - debug | 0 - producao
 
   //await AnuncioController.init();
-  // await transferenciaController.init();
-  //await AnuncioController.migrateProdutosTinyLojaMeier();
-  //await AnuncioController.importarProdutoTinyMensal();
-
-  // if (global.config_debug == 1) {
-  //   await AnuncioController.init();
-  //   return;
-  // }
+  //await transferenciaController.init();
+  //await devolucaoController.init();
+  //console.log("Concluido " + lib.currentDateTimeStr());
+  //return;
 
   try {
     let time = process.env.CRON_JOB_TIME || 10; //tempo em minutos

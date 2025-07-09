@@ -1,8 +1,10 @@
-import { TransferenciaRepository } from "../repository/transferenciaRepository.js";
-import { TransferenciaFilaRepository } from "../repository/transferenciaFilaRepository.js";
-import { TransferenciaMovtoRepository } from "../repository/transferenciaMovtoRepository.js";
+import { DevolucaoRepository } from "../repository/devolucaoRepository.js";
+import { DevolucaoFilaRepository } from "../repository/devolucaoFilaRepository.js";
+import { DevolucaoMovtoRepository } from "../repository/devolucaoMovtoRepository.js";
+
 import { ProdutoTinyRepository } from "../repository/produtoTinyRepository.js";
 import { MpkIntegracaoRepository } from "../repository/mpkIntegracaoRepository.js";
+
 import { GenRepository } from "../repository/genRepository.js";
 import { estoqueController } from "./estoqueController.js";
 
@@ -16,18 +18,22 @@ const STATUS_ERRO = "Erro";
 const SUB_STATUS_PROCESSANDO = "Processando";
 const SUB_STATUS_PROCESSADO_ESTOQUE = "Processado_estoque";
 
+// Definição dos depósitos
+const DEPOSITO_GERAL = "Geral";
+const DEPOSITO_TROCAS_DEFEITOS = "Trocas/Defeitos";
+
 async function init() {
-  await processarTransferenciaConfirmada();
+  await processarDevolucaoConfirmada();
   await processarEstoque();
 }
 
-async function processarTransferenciaConfirmada() {
+async function processarDevolucaoConfirmada() {
   const c = await TMongo.connect();
-  let repository = new TransferenciaRepository(c);
+  let repository = new DevolucaoRepository(c);
   let mpkIntegracao = new MpkIntegracaoRepository(c);
   let empresas = await mpkIntegracao.findAll({});
 
-  //Busco o id do produto no tiny e atualizo no item da transferencia
+  //Busco o id do produto no tiny e atualizo no item da devolucao
   for (let empresa of empresas) {
     let rows = await repository.findAll({
       status: STATUS_CONFIRMADO,
@@ -67,69 +73,11 @@ async function processarTransferenciaConfirmada() {
   await TMongo.disconnect();
 }
 
-async function estornarTransferencia(id_transferencia) {
-  return;
-  const c = await TMongo.connect();
-  let repository = new TransferenciaRepository(c);
-  let gen = new GenRepository(c);
-  let row = await repository.findById(id_transferencia);
-
-  delete row._id;
-  let new_id = await lib.newUUId();
-  //let t = await gen.findByName("transferencia");
-  // new_id = t.seq;
-  //let genId = await gen.getNextId("transferencia");
-  //new_id = genId;
-
-  let from_id_company = row.from_id_company;
-  let from_company = row.from_company;
-
-  let to_id_company = row.to_id_company;
-  let to_company = row.to_company;
-
-  //inverter os dados
-  row.from_id_company = to_id_company;
-  row.from_company = to_company;
-
-  row.to_id_company = from_id_company;
-  row.to_company = from_company;
-  row.id = new_id;
-  row.status = STATUS_CONFIRMADO;
-  row.sub_status = "";
-  row.created_at = new Date();
-  row.updated_at = null;
-  row.user_update = null;
-
-  let items = [];
-  let rows = row.items;
-  for (const r of rows) {
-    let from_id_product = r.from_id_product;
-    let to_id_product = r.to_id_product;
-    //versão dos dados
-    r.from_id_product = to_id_product;
-    r.to_id_product = from_id_product;
-    r.id = Date.now();
-
-    r.status = "Confirmado";
-    r.id_entrada = null;
-    r.id_saida = null;
-    r.company = row.to_company;
-    r.from_id_company = row.from_id_company;
-    r.id_pai = new_id;
-    r.created_at = new Date();
-    items.push(r);
-  }
-
-  row.items = items;
-  //await repository.create(row);
-  console.log(row);
-}
-
 async function processarEstoque() {
   const c = await TMongo.connect();
-  const transferenciaMovto = new TransferenciaMovtoRepository(c);
-  const fila = new TransferenciaFilaRepository(c);
-  let repository = new TransferenciaRepository(c);
+  const devolucaoMovto = new DevolucaoMovtoRepository(c);
+  const fila = new DevolucaoFilaRepository(c);
+  let repository = new DevolucaoRepository(c);
   let mpkIntegracao = new MpkIntegracaoRepository(c);
   let empresas = await mpkIntegracao.findAll({});
   let empresa_from = null;
@@ -141,8 +89,9 @@ async function processarEstoque() {
     status: STATUS_CONFIRMADO,
     sub_status: SUB_STATUS_PROCESSANDO,
   });
+
   if (!Array.isArray(rows) || rows.length <= 0) {
-    console.log("Nenhuma transferencia para processar");
+    console.log("Nenhuma devolucao para processar");
     return;
   }
 
@@ -155,7 +104,7 @@ async function processarEstoque() {
     let obj = await fila.findById(cod_transf);
 
     if (obj) {
-      console.log(`Transferencia já processada: ${cod_transf}`);
+      console.log(`Devolucao já processada: ${cod_transf}`);
       continue;
     }
 
@@ -179,8 +128,8 @@ async function processarEstoque() {
       if (!item?.id_entrada || !item?.id_saida) continue;
       item_code = item?.code;
 
-      let saida = await transferenciaMovto.findById(item?.id_saida);
-      let entrada = await transferenciaMovto.findById(item?.id_entrada);
+      let saida = await devolucaoMovto.findById(item?.id_saida);
+      let entrada = await devolucaoMovto.findById(item?.id_entrada);
       let status = STATUS_CONCLUIDO;
 
       //******************************************************************************************* */
@@ -194,10 +143,12 @@ async function processarEstoque() {
             item.quantity,
             "S",
             row.to_company,
-            doc
+            doc,
+            "SIM",
+            null
           );
           if (ts) {
-            await transferenciaMovto.create({
+            await devolucaoMovto.create({
               id: item?.id_saida,
               id_produto: item_code,
               id_transferencia: cod_transf,
@@ -205,6 +156,7 @@ async function processarEstoque() {
               tipo: "S",
               response: ts,
               created_at: new Date(),
+              deposito: null,
             });
           }
         } catch (error) {
@@ -223,11 +175,13 @@ async function processarEstoque() {
             item.quantity,
             "E",
             row.from_company,
-            doc
+            doc,
+            "SIM",
+            DEPOSITO_TROCAS_DEFEITOS
           );
 
           if (te) {
-            await transferenciaMovto.create({
+            await devolucaoMovto.create({
               id: item?.id_entrada,
               id_produto: item_code,
               id_transferencia: cod_transf,
@@ -235,6 +189,7 @@ async function processarEstoque() {
               tipo: "E",
               response: te,
               created_at: new Date(),
+              deposito: DEPOSITO_TROCAS_DEFEITOS,
             });
           }
         } catch (error) {
@@ -252,8 +207,8 @@ async function processarEstoque() {
   }
 }
 
-const transferenciaController = {
+const devolucaoController = {
   init,
 };
 
-export { transferenciaController };
+export { devolucaoController };
