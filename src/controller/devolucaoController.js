@@ -5,7 +5,6 @@ import { DevolucaoMovtoRepository } from "../repository/devolucaoMovtoRepository
 import { ProdutoTinyRepository } from "../repository/produtoTinyRepository.js";
 import { MpkIntegracaoRepository } from "../repository/mpkIntegracaoRepository.js";
 
-import { GenRepository } from "../repository/genRepository.js";
 import { estoqueController } from "./estoqueController.js";
 
 import { TMongo } from "../infra/mongoClient.js";

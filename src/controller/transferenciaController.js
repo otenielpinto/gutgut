@@ -3,7 +3,7 @@ import { TransferenciaFilaRepository } from "../repository/transferenciaFilaRepo
 import { TransferenciaMovtoRepository } from "../repository/transferenciaMovtoRepository.js";
 import { ProdutoTinyRepository } from "../repository/produtoTinyRepository.js";
 import { MpkIntegracaoRepository } from "../repository/mpkIntegracaoRepository.js";
-import { GenRepository } from "../repository/genRepository.js";
+
 import { estoqueController } from "./estoqueController.js";
 
 import { TMongo } from "../infra/mongoClient.js";
@@ -65,64 +65,6 @@ async function processarTransferenciaConfirmada() {
     }
   }
   await TMongo.disconnect();
-}
-
-async function estornarTransferencia(id_transferencia) {
-  return;
-  const c = await TMongo.connect();
-  let repository = new TransferenciaRepository(c);
-  let gen = new GenRepository(c);
-  let row = await repository.findById(id_transferencia);
-
-  delete row._id;
-  let new_id = await lib.newUUId();
-  //let t = await gen.findByName("transferencia");
-  // new_id = t.seq;
-  //let genId = await gen.getNextId("transferencia");
-  //new_id = genId;
-
-  let from_id_company = row.from_id_company;
-  let from_company = row.from_company;
-
-  let to_id_company = row.to_id_company;
-  let to_company = row.to_company;
-
-  //inverter os dados
-  row.from_id_company = to_id_company;
-  row.from_company = to_company;
-
-  row.to_id_company = from_id_company;
-  row.to_company = from_company;
-  row.id = new_id;
-  row.status = STATUS_CONFIRMADO;
-  row.sub_status = "";
-  row.created_at = new Date();
-  row.updated_at = null;
-  row.user_update = null;
-
-  let items = [];
-  let rows = row.items;
-  for (const r of rows) {
-    let from_id_product = r.from_id_product;
-    let to_id_product = r.to_id_product;
-    //versão dos dados
-    r.from_id_product = to_id_product;
-    r.to_id_product = from_id_product;
-    r.id = Date.now();
-
-    r.status = "Confirmado";
-    r.id_entrada = null;
-    r.id_saida = null;
-    r.company = row.to_company;
-    r.from_id_company = row.from_id_company;
-    r.id_pai = new_id;
-    r.created_at = new Date();
-    items.push(r);
-  }
-
-  row.items = items;
-  //await repository.create(row);
-  console.log(row);
 }
 
 async function processarEstoque() {
