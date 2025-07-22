@@ -1,6 +1,4 @@
-//Classe tem letras maiuculoas
-
-const collection = "devolucao_enviada";
+const collection = "tmp_devolucao";
 
 class DevolucaoRepository {
   constructor(db) {
