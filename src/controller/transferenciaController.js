@@ -40,13 +40,27 @@ async function processarTransferenciaConfirmada() {
 
     for (const row of rows) {
       let items = row.items;
+      let nao_achou_produto = 0;
       for (const item of items) {
         let item_nao_conformidade = 0;
-        let produto_tiny_loja_destino = await produto.findByCodigo(item?.code);
-        if (!produto_tiny_loja_destino) {
+        let produto_tiny_loja_destino = null;
+
+        try {
+          produto_tiny_loja_destino = await produto.findByCodigo(item?.code);
+        } catch (error) {
+          console.log(`Erro ao buscar produto: ${item.code}`, error);
+        }
+
+        if (
+          !produto_tiny_loja_destino ||
+          produto_tiny_loja_destino == null ||
+          produto_tiny_loja_destino == undefined
+        ) {
           console.log(`Produto não encontrado: ${item.code}`);
+          nao_achou_produto = 1;
           continue;
         }
+
         if (item.quantity !== item.qtd_original) {
           nao_conformidade = 1;
           item_nao_conformidade = 1;
@@ -57,6 +71,14 @@ async function processarTransferenciaConfirmada() {
         if (!item.id_saida || item?.id_saida == null)
           item.id_saida = await lib.newUUId();
         item.nao_conformidade = item_nao_conformidade;
+      }
+
+      //disparar um log de erro se nao achou produto
+      if (nao_achou_produto > 0) {
+        console.error(
+          `Erro: Produto não encontrado para a transferência: ${row.id}`
+        );
+        continue;
       }
 
       row.sub_status = SUB_STATUS_PROCESSANDO;
@@ -117,8 +139,15 @@ async function processarEstoque() {
       continue;
     }
 
+    let nao_validado = 0;
     for (const item of items) {
-      if (!item?.id_entrada || !item?.id_saida) continue;
+      if (!item?.id_entrada || !item?.id_saida) {
+        nao_validado = 1;
+        console.log(
+          `Transferencia não validada, falta id_entrada ou id_saida: ${item?.code}`
+        );
+        continue;
+      }
       item_code = item?.code;
 
       let saida = await transferenciaMovto.findById(item?.id_saida);
@@ -187,6 +216,13 @@ async function processarEstoque() {
       //******************************************************************************************* */
       item.status = status;
     }
+
+    //disparar um log de erro se nao achou produto
+    if (nao_validado > 0) {
+      console.log(`Transferencia não validada: ${cod_transf}`);
+      continue;
+    }
+
     row.sub_status = SUB_STATUS_PROCESSADO_ESTOQUE;
     row.status = STATUS_CONCLUIDO;
     await repository.update(row.id, row);
