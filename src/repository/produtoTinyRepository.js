@@ -87,9 +87,10 @@ class ProdutoTinyRepository {
   }
 
   async findByCodigo(codigo) {
+    let cleanCode = codigo.replace(/\t/g, "").trim();
     return await this.db
       .collection(collection)
-      .findOne({ codigo: String(codigo), id_tenant: this.id_tenant });
+      .findOne({ codigo: String(cleanCode), id_tenant: this.id_tenant });
   }
 
   async findSemCodigo() {
