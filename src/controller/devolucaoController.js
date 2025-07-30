@@ -42,13 +42,24 @@ async function processarDevolucaoConfirmada() {
     if (!Array.isArray(rows) && rows.length <= 0) continue;
     let produto = new ProdutoTinyRepository(c, empresa.id);
     let nao_conformidade = 0;
+    let nao_achou_produto = 0;
 
     for (const row of rows) {
+      nao_achou_produto = 0;
       let items = row.items;
       for (const item of items) {
         let item_nao_conformidade = 0;
-        let produto_tiny_loja_destino = await produto.findByCodigo(item?.code);
+        let produto_tiny_loja_destino = null;
+
+        try {
+          produto_tiny_loja_destino = await produto.findByCodigo(item?.code);
+        } catch (error) {
+          nao_achou_produto++;
+          console.error(`Error fetching product: ${error.message}`);
+        }
+
         if (!produto_tiny_loja_destino) {
+          nao_achou_produto++;
           console.log(`Produto não encontrado: ${item.code}`);
           continue;
         }
@@ -62,6 +73,13 @@ async function processarDevolucaoConfirmada() {
         if (!item.id_saida || item?.id_saida == null)
           item.id_saida = await lib.newUUId();
         item.nao_conformidade = item_nao_conformidade;
+      }
+
+      if (nao_achou_produto > 0) {
+        console.error(
+          `Erro: Produto não encontrado para a devolução: ${row.id}`
+        );
+        continue;
       }
 
       row.sub_status = SUB_STATUS_PROCESSANDO;
@@ -122,9 +140,14 @@ async function processarEstoque() {
       console.log("Empresa não encontrada");
       continue;
     }
+    let nao_validado = 0;
 
     for (const item of items) {
-      if (!item?.id_entrada || !item?.id_saida) continue;
+      if (!item?.id_entrada || !item?.id_saida) {
+        nao_validado = 1;
+        console.log(`Item não validado: ${item.code}`);
+        continue;
+      }
       item_code = item?.code;
 
       let saida = await devolucaoMovto.findById(item?.id_saida);
@@ -199,6 +222,12 @@ async function processarEstoque() {
       //******************************************************************************************* */
       item.status = status;
     }
+
+    if (nao_validado > 0) {
+      console.log(`Devolução não validada: ${cod_transf}`);
+      continue;
+    }
+
     row.sub_status = SUB_STATUS_PROCESSADO_ESTOQUE;
     row.status = STATUS_CONCLUIDO;
     await repository.update(row.id, row);
