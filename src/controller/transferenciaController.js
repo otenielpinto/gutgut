@@ -203,6 +203,11 @@ async function processarEstoque() {
           console.log(`Erro ao transferir produto: ${item.code}`);
         }
 
+        if (!ts || ts == null) {
+          nao_validado = 1;
+          console.log(`Erro ao transferir produto: ${item.code}`);
+        }
+
         try {
           if (ts) {
             await transferenciaMovto.create({
@@ -236,6 +241,11 @@ async function processarEstoque() {
             doc
           );
         } catch (error) {
+          console.log(`Erro ao transferir produto: ${item.code}`);
+        }
+
+        if (!te || te == null) {
+          nao_validado = 1;
           console.log(`Erro ao transferir produto: ${item.code}`);
         }
 
