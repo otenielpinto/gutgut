@@ -154,7 +154,9 @@ async function transferir(
         " qtd: " +
         quantity +
         " tipo: " +
-        tipo
+        tipo +
+        " doc : " +
+        doc
     );
     response = await tiny.post("produto.atualizar.estoque.php", data);
     response = await tiny.tratarRetorno(response, "registros");
