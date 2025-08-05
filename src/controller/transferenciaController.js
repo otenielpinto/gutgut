@@ -15,7 +15,28 @@ const STATUS_PENDENTE = "Pendente";
 const STATUS_ERRO = "Erro";
 const SUB_STATUS_PROCESSANDO = "Processando";
 const SUB_STATUS_PROCESSADO_ESTOQUE = "Processado_estoque";
-const listaTransferencias = [];
+
+// Variável global para armazenar as transferências processadas
+let listaTransferencias = [];
+let ultimaDataVerificacao = new Date().toDateString();
+
+function verificarMudancaDia() {
+  const dataAtual = new Date().toDateString();
+  console.log(
+    `Verificando mudança de dia: ${dataAtual} - Última verificação: ${ultimaDataVerificacao}`
+  );
+
+  if (dataAtual !== ultimaDataVerificacao) {
+    console.log(
+      `Dia mudou de ${ultimaDataVerificacao} para ${dataAtual} - Zerando lista de transferências`
+    );
+    listaTransferencias = [];
+    ultimaDataVerificacao = dataAtual;
+    return true;
+  }
+
+  return false;
+}
 
 async function init() {
   await processarTransferenciaConfirmada();
@@ -91,6 +112,7 @@ async function processarTransferenciaConfirmada() {
 }
 
 async function processarEstoque() {
+  verificarMudancaDia();
   const c = await TMongo.connect();
   const transferenciaMovto = new TransferenciaMovtoRepository(c);
   const fila = new TransferenciaFilaRepository(c);
@@ -249,7 +271,7 @@ async function processarEstoque() {
     await repository.update(row.id, row);
     await fila.create({ id: cod_transf, created_at: new Date() });
 
-    if (listaTransferencias.length > 10) {
+    if (listaTransferencias.length > 100) {
       listaTransferencias.shift(); // Limitar o tamanho da lista para evitar consumo excessivo de memória
     }
   }
@@ -299,6 +321,7 @@ async function auditoriaTransferencias() {
 
 const transferenciaController = {
   init,
+  verificarMudancaDia,
 };
 
 export { transferenciaController };
