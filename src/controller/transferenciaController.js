@@ -15,6 +15,7 @@ const STATUS_PENDENTE = "Pendente";
 const STATUS_ERRO = "Erro";
 const SUB_STATUS_PROCESSANDO = "Processando";
 const SUB_STATUS_PROCESSADO_ESTOQUE = "Processado_estoque";
+const listaTransferencias = [];
 
 async function init() {
   await processarTransferenciaConfirmada();
@@ -123,6 +124,14 @@ async function processarEstoque() {
       continue;
     }
 
+    if (listaTransferencias.includes(cod_transf)) {
+      console.log(`Transferencia já processada: ${cod_transf}`);
+      continue;
+    }
+
+    if (!listaTransferencias.includes(cod_transf))
+      listaTransferencias.push(cod_transf);
+
     //localizar a empresa de origem , tive problemas o find não funcionou
     for (let e of empresas) {
       if (e.id == row.from_id_company) {
@@ -158,8 +167,9 @@ async function processarEstoque() {
       if (saida) {
         console.log(`Movimento já existe: ${item?.id_saida}`);
       } else {
+        let ts = null;
         try {
-          let ts = await estoqueController.transferir(
+          ts = await estoqueController.transferir(
             empresa_from.token,
             item.from_id_product,
             item.quantity,
@@ -167,6 +177,11 @@ async function processarEstoque() {
             row.to_company,
             doc
           );
+        } catch (error) {
+          console.log(`Erro ao transferir produto: ${item.code}`);
+        }
+
+        try {
           if (ts) {
             await transferenciaMovto.create({
               id: item?.id_saida,
@@ -187,8 +202,10 @@ async function processarEstoque() {
       if (entrada) {
         console.log(`Movimento já existe: ${item?.id_entrada}`);
       } else {
+        let te = null;
+
         try {
-          let te = await estoqueController.transferir(
+          te = await estoqueController.transferir(
             empresa_to.token,
             item.to_id_product,
             item.quantity,
@@ -196,7 +213,11 @@ async function processarEstoque() {
             row.from_company,
             doc
           );
+        } catch (error) {
+          console.log(`Erro ao transferir produto: ${item.code}`);
+        }
 
+        try {
           if (te) {
             await transferenciaMovto.create({
               id: item?.id_entrada,
@@ -227,7 +248,53 @@ async function processarEstoque() {
     row.status = STATUS_CONCLUIDO;
     await repository.update(row.id, row);
     await fila.create({ id: cod_transf, created_at: new Date() });
+
+    if (listaTransferencias.length > 10) {
+      listaTransferencias.shift(); // Limitar o tamanho da lista para evitar consumo excessivo de memória
+    }
   }
+}
+
+async function auditoriaTransferencias() {
+  // Esse script foi rodado para corrigir transferências que não tinham os ids de entrada e saída preenchidos. 30-07-2025
+
+  return;
+  const c = await TMongo.connect();
+  let repository = new TransferenciaRepository(c);
+  const fila = new TransferenciaFilaRepository(c);
+
+  let rows = await repository.transferenciasPendentes();
+  if (!Array.isArray(rows) || rows.length <= 0) {
+    console.log("Nenhuma transferencia pendente para auditar");
+    return;
+  }
+  const produtos = [];
+  let qtd = 0;
+
+  for (const row of rows) {
+    let items = row.items;
+    let nao_validado = 0;
+    let index = 0;
+    for (const item of items) {
+      index++;
+      if (!item?.id_entrada || !item?.id_saida) {
+        produtos.push(item);
+        nao_validado = 1;
+        console.log(`${row.id} - ${index} - ${item?.code}`);
+      }
+      produtos.push(item);
+
+      if (nao_validado > 0) {
+        qtd++;
+        row.status = STATUS_CONFIRMADO;
+        console.log("reprocessando transferencia: " + row.id);
+        await repository.update(row.id, row);
+        await fila.delete(row.id);
+        console.log("excluindo fila: " + row.id);
+      }
+    }
+  }
+  console.log("total de produtos não validados: " + produtos.length);
 }
 
 const transferenciaController = {

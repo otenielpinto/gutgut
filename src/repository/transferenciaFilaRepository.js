@@ -20,7 +20,9 @@ class TransferenciaFilaRepository {
   }
 
   async delete(id) {
-    const result = await this.db.collection(collection).deleteOne({ id: id });
+    const result = await this.db
+      .collection(collection)
+      .deleteOne({ id: Number(id) });
     return result.deletedCount > 0;
   }
 

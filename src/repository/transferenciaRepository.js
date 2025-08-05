@@ -50,6 +50,22 @@ class TransferenciaRepository {
       console.log(e);
     }
   }
+
+  async transferenciasPendentes() {
+    const criterio = {
+      items: {
+        $elemMatch: {
+          $or: [
+            { id_entrada: { $exists: false } },
+            { id_saida: { $exists: false } },
+          ],
+        },
+      },
+      status: "Concluido",
+    };
+
+    return await this.db.collection(collection).find(criterio).toArray();
+  }
 }
 
 export { TransferenciaRepository };

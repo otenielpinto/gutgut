@@ -31,10 +31,8 @@ async function init() {
   //return;
 
   try {
-    let time = process.env.CRON_JOB_TIME || 10; //tempo em minutos
+    let time = process.env.CRON_JOB_TIME || 15; //tempo em minutos
     const job = nodeSchedule.scheduleJob(`*/${time} * * * *`, async () => {
-      console.log(" Job start as " + lib.currentDateTimeStr());
-
       if (global.processandoNow == 1) {
         console.log(
           " Job can't started [processing] " + lib.currentDateTimeStr()
@@ -43,6 +41,7 @@ async function init() {
       }
 
       try {
+        console.log(" Job start as " + lib.currentDateTimeStr());
         await task();
       } finally {
         global.processandoNow = 0;
