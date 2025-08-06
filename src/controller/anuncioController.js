@@ -24,6 +24,81 @@ async function init() {
 
   //atualizar novos produtos cadastrados no tiny  5 minutos
   await importarProdutoTinyDiario();
+
+  //exclua todos os produtos que foram excluido do tiny 1 x ao dia
+  await excluirProdutoTiny();
+}
+
+async function excluirProdutoTiny() {
+  let tenants = await mpkIntegracaoController.findAll(filterTiny);
+  for (let tenant of tenants) {
+    let key = "Excluir Produtos Database " + tenant.id_tenant;
+    if ((await systemService.started(tenant.id_tenant, key)) == 1) continue;
+    await excluirProdutoByTenant(tenant);
+  }
+}
+
+async function excluirProdutoByTenant(tenant) {
+  TMongo.close();
+  let produtoTinyRepository = new ProdutoTinyRepository(
+    await TMongo.connect(),
+    tenant.id_tenant
+  );
+
+  const tiny = new Tiny({ token: tenant.token });
+  tiny.setTimeout(1000 * 10);
+  let page = 1;
+  let data = [
+    { key: "pesquisa", value: "" },
+    { key: "situacao", value: "E" },
+    { key: "pagina", value: page },
+  ];
+  let result = await tiny.post("produtos.pesquisa.php", data);
+  let page_count = result?.data?.retorno?.numero_paginas;
+
+  let response;
+  for (let page = page_count; page > 0; page--) {
+    data = [
+      { key: "pesquisa", value: "" },
+      { key: "situacao", value: "E" },
+      { key: "pagina", value: page },
+    ];
+    result = null;
+    response = null;
+
+    for (let t = 1; t < 5; t++) {
+      console.log(
+        tenant.id_tenant +
+          ">>" +
+          "Tentativa: " +
+          t +
+          "  Paginas: " +
+          page_count +
+          " de " +
+          page
+      );
+      result = await tiny.post("produtos.pesquisa.php", data);
+      response = await tiny.tratarRetorno(result, "produtos");
+      if (tiny.status() == "OK") break;
+      response = null;
+    }
+
+    if (!Array.isArray(response)) continue;
+    let items = [];
+
+    for (let item of response) {
+      let obj = item?.produto ? item?.produto : {};
+      if (!obj?.id) continue;
+      obj.id_tenant = tenant.id_tenant;
+      obj.updated_at = new Date();
+      items.push(obj);
+    }
+    let rows = [];
+    for (let item of items) rows.push(String(item.id));
+
+    response = await produtoTinyRepository.deleteMany({ id: { $in: rows } });
+    console.log(response);
+  }
 }
 
 async function importarProdutoTinyMensal() {
@@ -258,12 +333,8 @@ async function importarProdutoTinyByTenant(tenant) {
       items.push(obj);
     }
     for (let item of items) {
-      console.log("Produto: ", item.id);
       await produtoTinyRepository.update(item.id, item);
     }
-    await lib.sleep(1000 * 2);
-
-    //await produtoTinyRepository.insertMany(items);
   }
 }
 
