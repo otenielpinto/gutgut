@@ -67,7 +67,13 @@ class Tiny {
   }
 
   setTimeout(timeout) {
-    if (timeout > 0) console.log("Timeout setado para ", timeout);
+    if (timeout > 0)
+      console.log(
+        "Timeout setado para ",
+        (timeout / 1000).toFixed(2),
+        " segundos"
+      );
+    else console.log("Timeout desativado");
     this.timeout = timeout;
   }
 }

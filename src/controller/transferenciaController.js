@@ -3,6 +3,7 @@ import { TransferenciaFilaRepository } from "../repository/transferenciaFilaRepo
 import { TransferenciaMovtoRepository } from "../repository/transferenciaMovtoRepository.js";
 import { ProdutoTinyRepository } from "../repository/produtoTinyRepository.js";
 import { MpkIntegracaoRepository } from "../repository/mpkIntegracaoRepository.js";
+import fs from "fs";
 
 import { estoqueController } from "./estoqueController.js";
 
@@ -133,6 +134,7 @@ async function processarEstoque() {
     return;
   }
 
+  let retorno = [];
   for (const row of rows) {
     let items = row.items;
     empresa_from = null;
@@ -180,7 +182,6 @@ async function processarEstoque() {
         continue;
       }
       item_code = item?.code;
-
       let saida = await transferenciaMovto.findById(item?.id_saida);
       let entrada = await transferenciaMovto.findById(item?.id_entrada);
       let status = STATUS_CONCLUIDO;
@@ -190,39 +191,38 @@ async function processarEstoque() {
         console.log(`Movimento já existe: ${item?.id_saida}`);
       } else {
         let ts = null;
-        try {
-          ts = await estoqueController.transferir(
-            empresa_from.token,
-            item.from_id_product,
-            item.quantity,
-            "S",
-            row.to_company,
-            doc
-          );
-        } catch (error) {
-          console.log(`Erro ao transferir produto: ${item.code}`);
-        }
+        ts = await estoqueController.transferir(
+          empresa_from.token,
+          item.from_id_product,
+          item.quantity,
+          "S",
+          row.to_company,
+          doc
+        );
 
         if (!ts || ts == null) {
           nao_validado = 1;
           console.log(`Erro ao transferir produto: ${item.code}`);
+          retorno.push({
+            id_produto: item_code,
+            interno_tiny: item.from_id_product,
+            doc_transf: doc,
+            origem: empresa_from.codigo,
+            tipo: "Saida",
+            status: "Erro",
+          });
         }
 
-        try {
-          if (ts) {
-            await transferenciaMovto.create({
-              id: item?.id_saida,
-              id_produto: item_code,
-              id_transferencia: cod_transf,
-              status: "Concluido",
-              tipo: "S",
-              response: ts,
-              created_at: new Date(),
-            });
-          }
-        } catch (error) {
-          console.log(`Erro ao atualizar produto: ${item.code}`);
-          status = STATUS_ERRO;
+        if (ts) {
+          await transferenciaMovto.create({
+            id: item?.id_saida,
+            id_produto: item_code,
+            id_transferencia: cod_transf,
+            status: "Concluido",
+            tipo: "S",
+            response: ts,
+            created_at: new Date(),
+          });
         }
       }
       //******************************************************************************************* */
@@ -230,45 +230,58 @@ async function processarEstoque() {
         console.log(`Movimento já existe: ${item?.id_entrada}`);
       } else {
         let te = null;
-
-        try {
-          te = await estoqueController.transferir(
-            empresa_to.token,
-            item.to_id_product,
-            item.quantity,
-            "E",
-            row.from_company,
-            doc
-          );
-        } catch (error) {
-          console.log(`Erro ao transferir produto: ${item.code}`);
-        }
+        te = await estoqueController.transferir(
+          empresa_to.token,
+          item.to_id_product,
+          item.quantity,
+          "E",
+          row.from_company,
+          doc
+        );
 
         if (!te || te == null) {
           nao_validado = 1;
           console.log(`Erro ao transferir produto: ${item.code}`);
+          retorno.push({
+            id_produto: item_code,
+            interno_tiny: item.to_id_product,
+            doc_transf: doc,
+            origem: empresa_to.codigo,
+            tipo: "Entrada",
+            status: "Erro",
+          });
         }
 
-        try {
-          if (te) {
-            await transferenciaMovto.create({
-              id: item?.id_entrada,
-              id_produto: item_code,
-              id_transferencia: cod_transf,
-              status: "Concluido",
-              tipo: "E",
-              response: te,
-              created_at: new Date(),
-            });
-          }
-        } catch (error) {
-          console.log(`Erro ao atualizar produto: ${item.code}`);
-          status = STATUS_ERRO;
+        if (te) {
+          await transferenciaMovto.create({
+            id: item?.id_entrada,
+            id_produto: item_code,
+            id_transferencia: cod_transf,
+            status: "Concluido",
+            tipo: "E",
+            response: te,
+            created_at: new Date(),
+          });
         }
       }
       //******************************************************************************************* */
       item.status = status;
     }
+
+    // console.log(retorno);
+    // //salvar o retorno em arquivo txt
+    // if (retorno.length > 0) {
+    //   const filePath = `transferencia_com_erros.txt`;
+    //   const data = retorno.map((item) => JSON.stringify(item)).join("\n");
+    //   fs.write;
+    //   fs.writeFile(filePath, data, (err) => {
+    //     if (err) {
+    //       console.error("Erro ao salvar o arquivo:", err);
+    //     } else {
+    //       console.log("Arquivo salvo com sucesso:", filePath);
+    //     }
+    //   });
+    // }
 
     //disparar um log de erro se nao achou produto
     if (nao_validado > 0) {
@@ -289,13 +302,18 @@ async function processarEstoque() {
 
 async function auditoriaTransferencias() {
   // Esse script foi rodado para corrigir transferências que não tinham os ids de entrada e saída preenchidos. 30-07-2025
-
   return;
+
   const c = await TMongo.connect();
   let repository = new TransferenciaRepository(c);
   const fila = new TransferenciaFilaRepository(c);
+  const transferenciaMovto = new TransferenciaMovtoRepository(c);
 
-  let rows = await repository.transferenciasPendentes();
+  let rows = await repository.findAll({
+    status: STATUS_CONCLUIDO,
+    sub_status: SUB_STATUS_PROCESSADO_ESTOQUE,
+  });
+
   if (!Array.isArray(rows) || rows.length <= 0) {
     console.log("Nenhuma transferencia pendente para auditar");
     return;
@@ -307,23 +325,38 @@ async function auditoriaTransferencias() {
     let items = row.items;
     let nao_validado = 0;
     let index = 0;
+    console.log(`lendo pedido : ${row.id} `);
+
     for (const item of items) {
       index++;
+
       if (!item?.id_entrada || !item?.id_saida) {
         produtos.push(item);
         nao_validado = 1;
         console.log(`${row.id} - ${index} - ${item?.code}`);
       }
-      produtos.push(item);
+
+      let saida = await transferenciaMovto.findById(item?.id_saida);
+      let entrada = await transferenciaMovto.findById(item?.id_entrada);
+
+      if (!saida || !entrada) {
+        produtos.push(item);
+        nao_validado = 1;
+        console.log(`${row.id} - ${index} - ${item?.code}`);
+      }
 
       if (nao_validado > 0) {
-        qtd++;
-        row.status = STATUS_CONFIRMADO;
-        console.log("reprocessando transferencia: " + row.id);
-        await repository.update(row.id, row);
-        await fila.delete(row.id);
-        console.log("excluindo fila: " + row.id);
+        break;
       }
+    }
+
+    if (nao_validado > 0) {
+      qtd++;
+      row.status = STATUS_CONFIRMADO;
+      console.log("reprocessando transferencia: " + row.id);
+      await repository.update(row.id, row);
+      await fila.delete(row.id);
+      console.log("excluindo fila: " + row.id);
     }
   }
   console.log("total de produtos não validados: " + produtos.length);

@@ -158,8 +158,9 @@ async function processarEstoque() {
       if (saida) {
         console.log(`Movimento já existe: ${item?.id_saida}`);
       } else {
+        let ts = null;
         try {
-          let ts = await estoqueController.transferir(
+          ts = await estoqueController.transferir(
             empresa_from.token,
             item.from_id_product,
             item.quantity,
@@ -169,6 +170,8 @@ async function processarEstoque() {
             "SIM",
             null
           );
+          if (!ts || ts == null) nao_validado++;
+
           if (ts) {
             await devolucaoMovto.create({
               id: item?.id_saida,
@@ -191,7 +194,8 @@ async function processarEstoque() {
         console.log(`Movimento já existe: ${item?.id_entrada}`);
       } else {
         try {
-          let te = await estoqueController.transferir(
+          let te = null;
+          te = await estoqueController.transferir(
             empresa_to.token,
             item.to_id_product,
             item.quantity,
@@ -201,6 +205,7 @@ async function processarEstoque() {
             "SIM",
             DEPOSITO_TROCAS_DEFEITOS
           );
+          if (!te || te == null) nao_validado++;
 
           if (te) {
             await devolucaoMovto.create({
