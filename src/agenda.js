@@ -3,6 +3,7 @@ import { lib } from "./utils/lib.js";
 import { AnuncioController } from "./controller/anuncioController.js";
 import { transferenciaController } from "./controller/transferenciaController.js";
 import { devolucaoController } from "./controller/devolucaoController.js";
+import { produtoSemCodigoController } from "./controller/produtoSemCodigoController.js";
 import nodeSchedule from "node-schedule";
 
 global.processandoNow = 0;
@@ -14,6 +15,7 @@ async function task() {
   await AnuncioController.init();
   await transferenciaController.init();
   await devolucaoController.init();
+  await produtoSemCodigoController.init();
 
   global.processandoNow = 0;
   console.log(" Job finished - task " + lib.currentDateTimeStr());
@@ -27,6 +29,7 @@ async function init() {
   //await AnuncioController.init();
   //await transferenciaController.init();
   //await devolucaoController.init();
+  //await produtoSemCodigoController.init();
   //console.log("Concluido " + lib.currentDateTimeStr());
   //return;
 
