@@ -110,8 +110,12 @@ async function importarProdutoTinyMensal() {
   let tenants = await mpkIntegracaoController.findAll(filterTiny);
   let key = "importarProdutoTinyMensal";
   for (let tenant of tenants) {
-    if ((await systemService.monthlyTaskExecuted(tenant.id_tenant, key)) == 1)
+    if ((await systemService.monthlyTaskExecuted(tenant.id_tenant, key)) == 1) {
+      console.log(
+        "Tarefa mensal ja executada para o tenant " + tenant.id_tenant
+      );
       continue;
+    }
 
     try {
       await systemService.markMonthlyTaskExecuted(tenant.id_tenant, key);

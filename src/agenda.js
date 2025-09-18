@@ -30,6 +30,7 @@ async function init() {
   //await transferenciaController.init();
   //await devolucaoController.init();
   //await produtoSemCodigoController.init();
+  //await AnuncioController.importarProdutoTinyMensal();
   //console.log("Concluido " + lib.currentDateTimeStr());
   //return;
 
