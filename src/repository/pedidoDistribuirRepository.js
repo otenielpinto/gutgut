@@ -2,12 +2,12 @@
 
 import { Repository } from "./baseRepository.js";
 
-class ModeloRepository extends Repository {
+class PedidoDistribuirRepository extends Repository {
   constructor(id_tenant = null) {
-    super("tmp_modelo", id_tenant);
+    super("tmp_pedido_distribuir", id_tenant);
   }
 
-  // Métodos personalizados específicos para Modelo podem ser adicionados aqui
+  // Métodos personalizados específicos para PedidoDistribuir podem ser adicionados aqui
   // Os métodos básicos (create, update, delete, findAll, findById, etc.)
   // já estão disponíveis através da herança da TRepository
 
@@ -20,4 +20,4 @@ class ModeloRepository extends Repository {
   // }
 }
 
-export { ModeloRepository };
+export { PedidoDistribuirRepository };

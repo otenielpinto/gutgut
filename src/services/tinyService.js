@@ -1,4 +1,5 @@
 import { tinyApi } from "../api/tinyApi.js";
+import { lib } from "../utils/lib.js";
 
 //fiz aqui pra nao ter a dependencia da lib
 function sleep(ms) {

@@ -2,9 +2,9 @@
 
 import { Repository } from "./baseRepository.js";
 
-class ModeloRepository extends Repository {
+class MpkIntegracaoNewRepository extends Repository {
   constructor(id_tenant = null) {
-    super("tmp_modelo", id_tenant);
+    super("mpk_integracao", id_tenant);
   }
 
   // Métodos personalizados específicos para Modelo podem ser adicionados aqui
@@ -18,6 +18,10 @@ class ModeloRepository extends Repository {
   // async findActiveModelos() {
   //   return await this.findAll({ ativo: true });
   // }
+
+   
+
+
 }
 
-export { ModeloRepository };
+export { MpkIntegracaoNewRepository };

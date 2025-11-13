@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@types/node": "^24.10.0",
     "axios": "^1.7.4",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -19,6 +20,10 @@
   },
   "scripts": {
     "start": "npx nodemon server.js"
+  },
+  "engines": {
+    "node": "22.x",
+    "npm": "10.x"
   },
   "name": "tiny",
   "type": "module",

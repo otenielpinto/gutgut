@@ -291,6 +291,29 @@ function toJson(obj) {
   return JSON.stringify(obj);
 }
 
+function dateBrStrToDateUTCTime(dataString) {
+  // Divide a string usando a barra como separador
+  const partes = dataString.split("/");
+
+  // Obtém o dia, mês e ano das partes
+  const dia = parseInt(partes[0], 10);
+  const mes = parseInt(partes[1], 10) - 1; // Os meses em JavaScript começam do zero (0 = janeiro, 1 = fevereiro, ...)
+  const ano = parseInt(partes[2], 10);
+  let date = new Date();
+
+  let dataUTC = new Date(
+    Date.UTC(
+      ano,
+      mes,
+      dia,
+      date.getHours(),
+      date.getMinutes(),
+      date.getSeconds()
+    )
+  );
+  return dataUTC;
+}
+
 export const lib = {
   config_id_integracao,
   config_modulo_server,
@@ -323,5 +346,6 @@ export const lib = {
   formatDateBr,
   dateBrToIso8601,
   formatDate,
+  dateBrStrToDateUTCTime,
   toJson,
 };
