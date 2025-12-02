@@ -34,9 +34,9 @@ async function init() {
   //await produtoSemCodigoController.init();
   //await AnuncioController.importarProdutoTinyMensal();
   //await PedidoVendaController.init();
-  await PedidoDistribuirController.init();
-  console.log("Concluido " + lib.currentDateTimeStr());
-  return;
+  //await PedidoDistribuirController.init();
+  //console.log("Concluido " + lib.currentDateTimeStr());
+  //return;
 
   try {
     let time = process.env.CRON_JOB_TIME || 15; //tempo em minutos
@@ -72,6 +72,7 @@ async function init() {
         try {
           await PedidoVendaController.init();
         } finally {
+          await PedidoDistribuirController.init();
           global.hasPedido = 0;
         }
       }

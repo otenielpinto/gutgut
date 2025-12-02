@@ -2,8 +2,10 @@ import { PedidoDistribuirRepository } from "../repository/pedidoDistribuirReposi
 import { MpkIntegracaoNewRepository } from "../repository/mpkIntegracaoNewRepository.js";
 import { PedidoVendaRepository } from "../repository/pedidoVendaRepository.js";
 import { ProdutoTinyV2Repository } from "../repository/produtoTinyV2Repository.js";
+import { ProdutoUrlRepository } from "../repository/produtoUrlRepository.js";
 import { EstoqueService } from "./estoqueService.js";
 import { lib } from "../utils/lib.js";
+import { url } from "inspector";
 
 const status_pendente = 1;
 const status_distribuido = 2;
@@ -18,6 +20,7 @@ export class PedidoDistribuirService {
     this.pedidoDistribuir = new PedidoDistribuirRepository();
     this.mpkIntegracaoNewRepository = new MpkIntegracaoNewRepository();
     this.pedidoVendaRepository = new PedidoVendaRepository();
+    this.produtoUrlRepository = new ProdutoUrlRepository();
     this.depositos = [];
     this.lojas = [];
   }
@@ -107,7 +110,7 @@ export class PedidoDistribuirService {
       // Processar cada pedido pendente
       for (const pedido of pedidosPendentes) {
         await this.processarPedido(pedido);
-        return;
+        //return; // para testes
       }
     }
   }
@@ -161,11 +164,13 @@ export class PedidoDistribuirService {
 
     let produtos = await this.getProdutosByCodigo(codigo);
     let lojas = await this.getTenantsByProximidade();
+    let url_produto = "";
 
     for (const loja of lojas) {
       let saldoLoja = 0;
       let quantidadeDeposito = 0;
       let produto_id = null;
+
       //Necesario percorrer todas as lojas mesmo que a quantidade ja tenha sido suprida  12-11-2025 ( porque o gestor pode decidir distribuir parcialmente)
       //   // Parar se já foi suprida toda a quantidade necessária
       //   if (quantidadeRestante <= 0) {
@@ -199,6 +204,14 @@ export class PedidoDistribuirService {
         if (produtoInfo.id) delete produtoInfo.id;
       }
 
+      if (url_produto === "") {
+        // Obter URL do produto , vai entrar uma única vez
+        const produtoUrlData = await this.produtoUrlRepository.findOne({
+          variant_sku: codigo,
+        });
+        url_produto = produtoUrlData ? produtoUrlData?.variant_image : "";
+      }
+
       // Só processar lojas que têm saldo disponível
       if (saldoLoja > 0 && quantidadeRestante > 0) {
         // Calcular a quantidade a ser retirada desta loja
@@ -222,6 +235,8 @@ export class PedidoDistribuirService {
           ...produtoInfo,
           id: await lib.newUUId(),
           dt_movto: new Date(),
+          url_produto: url_produto,
+          qtd_carrinho: 0,
         });
 
         console.log(
@@ -247,6 +262,8 @@ export class PedidoDistribuirService {
           ...produtoInfo,
           id: await lib.newUUId(),
           dt_movto: new Date(),
+          url_produto: url_produto,
+          qtd_carrinho: 0,
         });
       }
     }

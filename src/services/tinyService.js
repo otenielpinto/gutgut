@@ -120,6 +120,17 @@ class TinyInfo {
     return page_count;
   }
 
+  async getPaginasPedidosDataAtualizacao(dataAtualizacao) {
+    let page = 1;
+    let data = [{ key: "dataAtualizacao", value: dataAtualizacao }];
+    let response = await this.instance.post("pedidos.pesquisa.php", data);
+
+    let {
+      retorno: { numero_paginas: page_count },
+    } = response?.data;
+    return page_count;
+  }
+
   async getDataInicialPedidos() {
     let pedido_numero_dias_processar =
       Number(process.env.PEDIDO_NUMERO_DIAS_PROCESSAR) || 30;

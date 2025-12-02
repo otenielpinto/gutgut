@@ -54,7 +54,7 @@ async function importarPedidosVendasTiny() {
         { key: "pagina", value: page },
       ];
 
-      for (const t = 0; t < 3; t++) {
+      for (let t = 0; t < 3; t++) {
         try {
           let response = await tiny.post("pedidos.pesquisa.php", data);
           let pedidos = await tiny.tratarRetorno(response, "pedidos");
@@ -94,12 +94,13 @@ async function importarPedidosVendasDataAtualizacao() {
 
   for (const tenant of tenants) {
     const tiny = new Tiny({ token: tenant?.token });
-    tiny.setTimeout(60000); //60 segundos
+    tiny.setTimeout(50000); //50 segundos
     const tintyInfo = new TinyInfo({ instance: tiny });
     let dataInicial = lib.formatDateBr(new Date());
-    const pageCount = await tintyInfo.getPaginasProdutosDataCriacao(
+    const pageCount = await tintyInfo.getPaginasPedidosDataAtualizacao(
       dataInicial
     );
+
     console.log(
       `Importando pedidos por data de atualização a partir de ${dataInicial} - Total de paginas: ${pageCount}`
     );
@@ -115,7 +116,7 @@ async function importarPedidosVendasDataAtualizacao() {
         { key: "pagina", value: page },
       ];
 
-      for (const t = 0; t < 3; t++) {
+      for (let t = 0; t < 3; t++) {
         try {
           let response = await tiny.post("pedidos.pesquisa.php", data);
           let pedidos = await tiny.tratarRetorno(response, "pedidos");
