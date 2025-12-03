@@ -40,7 +40,7 @@ async function importarPedidosVendasTiny() {
 
   for (const tenant of tenants) {
     const tiny = new Tiny({ token: tenant?.token });
-    tiny.setTimeout(60000); //60 segundos
+    tiny.setTimeout(50000); //60 segundos
     const tintyInfo = new TinyInfo({ instance: tiny });
     let dataInicial = await tintyInfo.getDataInicialPedidos();
     const pageCount = await tintyInfo.getPaginasPedidos(dataInicial);
@@ -82,7 +82,7 @@ async function importarPedidosVendasTiny() {
         }
       }
 
-      await lib.sleep(1000 * 10); //para nao estourar o limite de requisicoes
+      await lib.sleep(1000 * 5); //para nao estourar o limite de requisicoes
     }
   }
 }

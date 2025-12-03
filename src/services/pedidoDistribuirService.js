@@ -139,6 +139,8 @@ export class PedidoDistribuirService {
       for (const d of distribuicao.items) {
         d.pedido = pedido;
         d.numero_pedido = pedido?.numero || "";
+        d.numero_ecommerce = pedido?.numero_ecommerce || "";
+        d.nome_ecommerce = pedido?.ecommerce?.nomeEcommerce || "";
       }
       items_movto.push(...distribuicao.items);
 

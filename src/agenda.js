@@ -9,9 +9,11 @@ import { PedidoDistribuirController } from "./controller/pedidoDistribuirControl
 import nodeSchedule from "node-schedule";
 
 global.processandoNow = 0;
+global.hasPedido = 0;
 
 async function task() {
   global.processandoNow = 1;
+
   //colocar aqui controller;
   await TMongo.close();
   await AnuncioController.init();
@@ -61,10 +63,14 @@ async function init() {
 
   try {
     const timePedido = 6; //tempo em minutos
-    jobPedido = nodeSchedule.scheduleJob(
+    const jobPedido = nodeSchedule.scheduleJob(
       `*/${timePedido} * * * *`,
       async () => {
-        if (global.hasPedido == 1) {
+        if (global?.hasPedido == 1) {
+          console.log(
+            " Job Pedido Venda can't started [processing] " +
+              lib.currentDateTimeStr()
+          );
           return;
         }
 
