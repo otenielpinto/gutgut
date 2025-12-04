@@ -76,6 +76,7 @@ async function init() {
 
         global.hasPedido = 1;
         try {
+          console.log(" Job Pedido Venda start as " + lib.currentDateTimeStr());
           await PedidoVendaController.init();
         } finally {
           await PedidoDistribuirController.init();

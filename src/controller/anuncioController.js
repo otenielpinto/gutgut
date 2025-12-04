@@ -153,16 +153,17 @@ async function importarProdutoTinyDiario() {
         let response = await produtoPesquisaByDataCriacao(tenant, desde, page);
 
         if (!Array.isArray(response)) break;
-        console.log(
-          " A consulta retornou",
-          response?.length || 0,
-          " registros"
-        );
+        console.log("A consulta retornou", response?.length || 0, " registros");
 
         for (let item of response) {
           let obj = item?.produto ? item?.produto : {};
           if (!obj?.id) continue;
-          await produtoTinyRepository.update(obj?.id, obj);
+
+          let res = await produtoTinyRepository.updateOrCreate(
+            obj?.codigo,
+            obj
+          );
+          console.log(res.modifiedCount, obj.codigo);
         }
         if (response?.length < MAX_RECORDS) break;
       }
@@ -336,8 +337,27 @@ async function importarProdutoTinyByTenant(tenant) {
       obj.updated_at = new Date();
       items.push(obj);
     }
-    for (let item of items) {
-      await produtoTinyRepository.update(item.id, item);
+
+    //excluir por codigo antes de inserir
+    let rows = items.map((i) => String(i.codigo));
+    let resdelMany = await produtoTinyRepository.deleteMany({
+      codigo: { $in: rows },
+      id_tenant: tenant.id_tenant,
+    });
+    console.log("excluidos:", resdelMany.deletedCount);
+
+    //inserir novos registros
+    let res = await produtoTinyRepository.insertMany(items);
+    console.log("inseridos:", res.insertedCount);
+
+    //se nao inseriu, tentar um a um
+    if (!res || res.insertedCount != items.length) {
+      console.log(
+        `Nem todos os produtos foram inseridos no tenant ${tenant.id_tenant}. Tentando inserir um a um...`
+      );
+      for (let item of items) {
+        await produtoTinyRepository.update(item.id, item);
+      }
     }
   }
 }

@@ -40,8 +40,13 @@ function verificarMudancaDia() {
 }
 
 async function init() {
-  await processarTransferenciaConfirmada();
-  await processarEstoque();
+  verificarMudancaDia();
+  try {
+    await processarTransferenciaConfirmada();
+    await retificarTransferencias();
+  } finally {
+    await processarEstoque();
+  }
 }
 
 async function processarTransferenciaConfirmada() {
@@ -112,8 +117,121 @@ async function processarTransferenciaConfirmada() {
   await TMongo.disconnect();
 }
 
+async function acharNovoIdProduto({
+  c,
+  id_tenant,
+  cod_produto,
+  id_produto_tiny,
+}) {
+  console.log(`Movimento não encontrado: ${cod_produto}`);
+  let result = null;
+  const produto = new ProdutoTinyRepository(c, id_tenant);
+
+  let prods = await produto.findAll({
+    codigo: cod_produto,
+    id_tenant: id_tenant,
+  });
+  if (!Array.isArray(prods) || prods.length <= 0) {
+    console.log("Nenhum produto encontrado para o código: ", cod_produto);
+    return result;
+  }
+
+  //achar o novo codigo do produto no tiny na empresa correta
+  for (let p of prods) {
+    if (
+      p.id == id_produto_tiny &&
+      p.codigo == cod_produto &&
+      prods.length > 1
+    ) {
+      //excluindo o produto duplicado invalido   04-12-2025
+      console.log("Excluindo produto duplicado: ", p.id);
+      await produto.delete(p.id);
+      continue;
+    }
+
+    if (p.codigo == cod_produto) {
+      result = p.id;
+      break;
+    }
+  }
+
+  return result;
+}
+
+async function retificarTransferencias() {
+  const c = await TMongo.connect();
+  const transferenciaMovto = new TransferenciaMovtoRepository(c);
+  let repository = new TransferenciaRepository(c);
+
+  //aplicar a logica correcao se tiver campo nao_validado = 1
+  let rows = await repository.findAll({
+    status: STATUS_CONFIRMADO,
+    sub_status: SUB_STATUS_PROCESSANDO,
+    nao_validado: 1,
+  });
+
+  if (!Array.isArray(rows) || rows.length <= 0) {
+    console.log("Nenhuma transferencia para retificar");
+    return;
+  }
+
+  let updateCount = 0;
+  for (const row of rows) {
+    console.log(`Transferência ID: ${row.id}`);
+    updateCount = 0;
+    let new_id = null;
+
+    for (const item of row?.items) {
+      console.log("Retificando item: ", item);
+      let new_id = null;
+      if (!item?.id_entrada || !item?.id_saida) {
+        console.log(
+          `Faltando IDs na transferência ${row.id} para o item ${item?.code}`
+        );
+        continue;
+      }
+
+      let saida = await transferenciaMovto.findById(item?.id_saida);
+      let entrada = await transferenciaMovto.findById(item?.id_entrada);
+
+      if (!saida) {
+        //item.from_id_product
+        new_id = await acharNovoIdProduto({
+          c,
+          id_tenant: row.from_id_company,
+          cod_produto: item?.code,
+          id_produto_tiny: item?.from_id_product,
+        });
+
+        if (new_id) {
+          item.from_id_product = new_id;
+          updateCount++;
+        }
+      }
+
+      if (!entrada) {
+        new_id = await acharNovoIdProduto({
+          c,
+          id_tenant: row.to_id_company,
+          cod_produto: item?.code,
+          id_produto_tiny: item?.to_id_product,
+        });
+        if (new_id) {
+          item.to_id_product = new_id;
+          updateCount++;
+        }
+      }
+    }
+
+    if (updateCount > 0) {
+      row.nao_validado = 0;
+      console.log("Atualizando transferência: ", row.id);
+      await repository.update(row.id, row);
+    }
+  }
+}
+
 async function processarEstoque() {
-  verificarMudancaDia();
   const c = await TMongo.connect();
   const transferenciaMovto = new TransferenciaMovtoRepository(c);
   const fila = new TransferenciaFilaRepository(c);
@@ -129,6 +247,7 @@ async function processarEstoque() {
     status: STATUS_CONFIRMADO,
     sub_status: SUB_STATUS_PROCESSANDO,
   });
+
   if (!Array.isArray(rows) || rows.length <= 0) {
     console.log("Nenhuma transferencia para processar");
     return;
@@ -286,6 +405,8 @@ async function processarEstoque() {
     //disparar um log de erro se nao achou produto
     if (nao_validado > 0) {
       console.log(`Transferencia não validada: ${cod_transf}`);
+      //sinalizo para reprocessar e corrigir o campo
+      await repository.update(row.id, { nao_validado: 1 });
       continue;
     }
 
@@ -364,7 +485,6 @@ async function auditoriaTransferencias() {
 
 const transferenciaController = {
   init,
-  verificarMudancaDia,
 };
 
 export { transferenciaController };

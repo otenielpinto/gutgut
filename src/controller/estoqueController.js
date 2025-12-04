@@ -10,6 +10,20 @@ async function init() {
   //fazer uma atualizacao dos status =500  e tambem de todos que estão situacao =0
 }
 
+function isIdProdutoInvalido(response) {
+  try {
+    const erros = response?.retorno?.registros?.registro?.erros;
+    if (!Array.isArray(erros)) return false;
+    return erros.some(
+      (e) =>
+        e.erro === "Campo idProduto inválido." ||
+        e.erro === "Não é possível lançar estoque de um produto kit."
+    );
+  } catch (error) {
+    return false;
+  }
+}
+
 //idProduto = id Tiny do Produto
 async function produtoAtualizarEstoque(token, id_produto, quantity) {
   let date = new Date();
@@ -144,6 +158,7 @@ async function transferir(
   tiny.setTimeout(1000 * 10);
   let response = null;
   const data = [{ key: "estoque", value: { estoque } }];
+  //console.log(estoque, token);
 
   for (let t = 1; t < 5; t++) {
     console.log(
@@ -158,8 +173,18 @@ async function transferir(
         " doc : " +
         doc
     );
+
     response = await tiny.post("produto.atualizar.estoque.php", data);
     response = await tiny.tratarRetorno(response, "registros");
+
+    let hasProductError = isIdProdutoInvalido(response);
+    if (hasProductError) {
+      console.log(
+        `Erro na transferencia de estoque - Produto Invalido ID: ${id_produto}`
+      );
+      return null;
+    }
+
     if (tiny.status() == "OK") return response;
     response = null;
   }
@@ -172,6 +197,7 @@ const estoqueController = {
   produtoAtualizarEstoque,
   zerarEstoqueGeral,
   atualizarPrecosLote,
+  isIdProdutoInvalido,
 };
 
 export { estoqueController };

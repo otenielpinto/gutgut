@@ -36,6 +36,25 @@ class ProdutoTinyRepository {
     return result?.modifiedCount > 0;
   }
 
+  //usado nas atualizacoes diarias de produtos (outra forma estava duplicando os registros )
+  async updateOrCreate(codigo, payload) {
+    if (!payload.id_tenant) payload.id_tenant = this.id_tenant;
+    payload.updated_at = new Date();
+
+    payload.sys_codigo = String(Number(lib.onlyNumber(payload?.codigo)));
+    if (!payload.sys_status) payload.sys_status = 200; //sempre que for atualizar o produto no tiny, o sys_status deve ser 200
+    if (!payload.sys_estoque) payload.sys_estoque = 0;
+
+    const result = await this.db
+      .collection(collection)
+      .updateOne(
+        { codigo: String(codigo), id_tenant: this.id_tenant },
+        { $set: payload },
+        { upsert: true }
+      );
+    return result;
+  }
+
   async updateByCodigo(codigo, payload) {
     //  { upsert: false }   -- Nao cadastrar  nada se nao encontrar
 
