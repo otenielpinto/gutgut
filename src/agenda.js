@@ -62,29 +62,27 @@ async function init() {
   }
 
   try {
-    const timePedido = 6; //tempo em minutos
-    const jobPedido = nodeSchedule.scheduleJob(
-      `*/${timePedido} * * * *`,
-      async () => {
-        if (global?.hasPedido == 1) {
-          console.log(
-            " Job Pedido Venda can't started [processing] " +
-              lib.currentDateTimeStr()
-          );
-          return;
-        }
-
-        global.hasPedido = 1;
-        try {
-          console.log(" Job Pedido Venda start as " + lib.currentDateTimeStr());
-          await PedidoVendaController.init();
-        } finally {
-          await PedidoDistribuirController.init();
-          global.hasPedido = 0;
-        }
+    const time2 = 6; //tempo em minutos
+    const job2 = nodeSchedule.scheduleJob(`*/${time2} * * * *`, async () => {
+      if (global.hasPedido == 1) {
+        console.log(
+          "Job Pedido Venda can't started [processing] " +
+            lib.currentDateTimeStr()
+        );
+        return;
       }
-    );
+
+      global.hasPedido = 1;
+      try {
+        console.log(" Job Pedido Venda start as " + lib.currentDateTimeStr());
+        await PedidoVendaController.init();
+      } finally {
+        await PedidoDistribuirController.init();
+        global.hasPedido = 0;
+      }
+    });
   } catch (error) {
+    global.hasPedido = 0;
     throw new Error(`Can't start Pedido Venda! Err: ${error.message}`);
   }
 }

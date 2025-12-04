@@ -138,7 +138,7 @@ async function importarProdutoTinyDiario() {
     let info = new TinyInfo({ instance: tiny });
 
     let max_day = 7;
-    if ((await systemService.started(tenant.id_tenant, key)) == 1) max_day = 2; //apenas 2 dias
+    if ((await systemService.started(tenant.id_tenant, key)) == 1) max_day = 1; //apenas 1 dias
 
     for (let idx = max_day; idx >= 0; idx--) {
       let desde = lib.formatDateBr(lib.addDays(new Date(), idx * -1));
@@ -163,7 +163,7 @@ async function importarProdutoTinyDiario() {
             obj?.codigo,
             obj
           );
-          console.log(res.modifiedCount, obj.codigo);
+          //console.log(res.modifiedCount, obj.codigo);
         }
         if (response?.length < MAX_RECORDS) break;
       }

@@ -16,7 +16,7 @@ class TransferenciaRepository {
     const result = await this.db
       .collection(collection)
       .updateOne({ id: Number(id) }, { $set: payload }, { upsert: true });
-    return result.modifiedCount > 0;
+    return result;
   }
 
   async delete(id) {

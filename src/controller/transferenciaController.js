@@ -3,7 +3,6 @@ import { TransferenciaFilaRepository } from "../repository/transferenciaFilaRepo
 import { TransferenciaMovtoRepository } from "../repository/transferenciaMovtoRepository.js";
 import { ProdutoTinyRepository } from "../repository/produtoTinyRepository.js";
 import { MpkIntegracaoRepository } from "../repository/mpkIntegracaoRepository.js";
-import fs from "fs";
 
 import { estoqueController } from "./estoqueController.js";
 
@@ -106,7 +105,7 @@ async function processarTransferenciaConfirmada() {
         console.error(
           `Erro: Produto não encontrado para a transferência: ${row.id}`
         );
-        continue;
+        //continue;
       }
 
       row.sub_status = SUB_STATUS_PROCESSANDO;
@@ -114,7 +113,6 @@ async function processarTransferenciaConfirmada() {
       await repository.update(row.id, row);
     }
   }
-  await TMongo.disconnect();
 }
 
 async function acharNovoIdProduto({
@@ -255,7 +253,7 @@ async function processarEstoque() {
 
   let retorno = [];
   for (const row of rows) {
-    let items = row.items;
+    let items = row.items || [];
     empresa_from = null;
     empresa_to = null;
     cod_transf = row?.id;
@@ -272,8 +270,9 @@ async function processarEstoque() {
       continue;
     }
 
-    if (!listaTransferencias.includes(cod_transf))
+    if (!listaTransferencias.includes(cod_transf)) {
       listaTransferencias.push(cod_transf);
+    }
 
     //localizar a empresa de origem , tive problemas o find não funcionou
     for (let e of empresas) {
@@ -385,22 +384,7 @@ async function processarEstoque() {
       }
       //******************************************************************************************* */
       item.status = status;
-    }
-
-    // console.log(retorno);
-    // //salvar o retorno em arquivo txt
-    // if (retorno.length > 0) {
-    //   const filePath = `transferencia_com_erros.txt`;
-    //   const data = retorno.map((item) => JSON.stringify(item)).join("\n");
-    //   fs.write;
-    //   fs.writeFile(filePath, data, (err) => {
-    //     if (err) {
-    //       console.error("Erro ao salvar o arquivo:", err);
-    //     } else {
-    //       console.log("Arquivo salvo com sucesso:", filePath);
-    //     }
-    //   });
-    // }
+    } //for items
 
     //disparar um log de erro se nao achou produto
     if (nao_validado > 0) {
@@ -410,10 +394,18 @@ async function processarEstoque() {
       continue;
     }
 
+    //estava enviando para atualizar todo objeto
     row.sub_status = SUB_STATUS_PROCESSADO_ESTOQUE;
     row.status = STATUS_CONCLUIDO;
-    await repository.update(row.id, row);
-    await fila.create({ id: cod_transf, created_at: new Date() });
+
+    let res = await repository.update(row.id, {
+      status: STATUS_CONCLUIDO,
+      sub_status: SUB_STATUS_PROCESSADO_ESTOQUE,
+    });
+    //console.log(res);
+    if (res?.modifiedCount > 0) {
+      await fila.create({ id: cod_transf, created_at: new Date() });
+    }
 
     if (listaTransferencias.length > 100) {
       listaTransferencias.shift(); // Limitar o tamanho da lista para evitar consumo excessivo de memória
