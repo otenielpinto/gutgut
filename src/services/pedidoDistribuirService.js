@@ -46,6 +46,8 @@ export class PedidoDistribuirService {
     for (const item of items) {
       let payload = { status: status_distribuido };
       let pedidoId = item?.pedido?.id || null;
+
+      //aqui eu posso mudar o status para solicitar em todas as lojas
       let response = await this.pedidoDistribuir.update(item.id, item);
 
       if (!response) {
