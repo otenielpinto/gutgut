@@ -31,21 +31,20 @@ export class PedidoDistribuirService {
       console.log("Items deve ser um array para distribuir o pedido");
       return;
     }
-    const payload = { status: status_distribuido };
-    const pedidos = new Set();
-    const pedidosComFaltaEstoque = [];
 
-    //pegar os pedidos que tiveram falta de estoque
+    const pedidos = new Set();
+    let hasEstoque = 0;
+
+    // Verificar se algum item tem estoque disponível
     for (const item of items) {
-      if (item.status_loja === 2) {
-        let pedidoId = item?.pedido?.id || null;
-        if (!pedidosComFaltaEstoque.includes(pedidoId)) {
-          pedidosComFaltaEstoque.push(pedidoId);
-        }
+      if (item.status_loja === 1) {
+        hasEstoque = 1;
+        break;
       }
     }
 
     for (const item of items) {
+      let payload = { status: status_distribuido };
       let pedidoId = item?.pedido?.id || null;
       let response = await this.pedidoDistribuir.update(item.id, item);
 
@@ -55,7 +54,7 @@ export class PedidoDistribuirService {
         );
       } else {
         if (!pedidos.has(pedidoId)) {
-          if (pedidosComFaltaEstoque.includes(pedidoId)) {
+          if (hasEstoque === 0) {
             payload.sub_status = 500; // Indica falta de estoque em algum item
             payload.obs_logistica = "ATENCAO";
           }
