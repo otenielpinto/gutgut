@@ -172,7 +172,14 @@ async function salvarPedidosVenda({ pedidosVendas = [], tiny = null } = {}) {
   for (const pedidoVenda of pedidosVendas) {
     let situacao = pedidoVenda?.situacao || "";
     let numero = pedidoVenda?.numero || "";
-    let ecommerce = pedidoVenda?.ecommerce || null;
+    let numero_ecommerce = pedidoVenda?.numero_ecommerce || "";
+
+    if (!numero_ecommerce || numero_ecommerce.trim() === "") {
+      console.log(
+        `Pedido sem número de ecommerce. Ignorando pedido. Pedido Número: ${numero}`
+      );
+      continue;
+    }
 
     //Critério para importar pedido  para shopee
     if (
@@ -195,18 +202,6 @@ async function salvarPedidosVenda({ pedidosVendas = [], tiny = null } = {}) {
       });
       //falta cancelar os produtos reservados para esse pedido
 
-      continue;
-    }
-
-    //se nao for ecommerce, pular
-    if (
-      !ecommerce ||
-      ecommerce?.nomeEcommerce == "" ||
-      ecommerce?.nomeEcommerce == null
-    ) {
-      console.log(
-        `Pedido ${pedidoVenda?.id} não possui ecommerce associado. Pulando.`
-      );
       continue;
     }
 
