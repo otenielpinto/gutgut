@@ -99,7 +99,7 @@ async function importarPedidosVendasDataAtualizacao() {
 
   for (const tenant of tenants) {
     const tiny = new Tiny({ token: tenant?.token });
-    tiny.setTimeout(50000); //50 segundos
+    tiny.setTimeout(30000); //30 segundos
     const tintyInfo = new TinyInfo({ instance: tiny });
     let dataInicial = lib.formatDateBr(new Date());
     const pageCount = await tintyInfo.getPaginasPedidosDataAtualizacao(
@@ -188,6 +188,12 @@ async function salvarPedidosVenda({ pedidosVendas = [], tiny = null } = {}) {
        * devo cancelar os produtos que foram reservados para esse pedido
        */
 
+      await repository.update(pedidoVenda?.id, {
+        situacao: 2,
+        situacao: situacao,
+      });
+      //falta cancelar os produtos reservados para esse pedido
+
       continue;
     }
 
@@ -208,7 +214,12 @@ async function salvarPedidosVenda({ pedidosVendas = [], tiny = null } = {}) {
       if (tiny.status() == "OK") {
         let pedido = await tiny.tratarRetorno(response, "pedido");
         pedido = { ...pedidoVenda, ...pedido };
-        await repository.create({ ...pedido, status: 1 });
+        await repository.create({
+          ...pedido,
+          status: 1,
+          sub_status: 0,
+          obs_logistica: "",
+        });
       }
     }
   }
