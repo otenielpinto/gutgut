@@ -15,7 +15,7 @@ async function task() {
   global.processandoNow = 1;
 
   //colocar aqui controller;
-  await TMongo.close();
+
   await AnuncioController.init();
   await transferenciaController.init();
   await devolucaoController.init();
@@ -24,6 +24,11 @@ async function task() {
   global.processandoNow = 0;
   console.log(" Job finished - task " + lib.currentDateTimeStr());
   console.log("*".repeat(60));
+
+  if (global.processandoNow == 0 && global.hasPedido == 0) {
+    console.log(" MongoDB - Disconnect " + lib.currentDateTimeStr());
+    await TMongo.disconnect();
+  }
 }
 
 async function init() {
@@ -74,7 +79,7 @@ async function init() {
 
       global.hasPedido = 1;
       try {
-        console.log(" Job Pedido Venda start as " + lib.currentDateTimeStr());
+        console.log("Job Pedido Venda start as " + lib.currentDateTimeStr());
         await PedidoVendaController.init();
       } finally {
         await PedidoDistribuirController.init();

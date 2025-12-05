@@ -39,7 +39,6 @@ async function excluirProdutoTiny() {
 }
 
 async function excluirProdutoByTenant(tenant) {
-  TMongo.close();
   let produtoTinyRepository = new ProdutoTinyRepository(
     await TMongo.connect(),
     tenant.id_tenant
@@ -126,7 +125,6 @@ async function importarProdutoTinyMensal() {
 }
 
 async function importarProdutoTinyDiario() {
-  TMongo.close();
   let tenants = await mpkIntegracaoController.findAll(filterTiny);
   const c = await TMongo.connect();
   const MAX_RECORDS = 100;
@@ -282,7 +280,6 @@ async function modificarStatusEstoque(tenant) {
 }
 
 async function importarProdutoTinyByTenant(tenant) {
-  TMongo.close();
   let produtoTinyRepository = new ProdutoTinyRepository(
     await TMongo.connect(),
     tenant.id_tenant
@@ -483,7 +480,7 @@ async function processarEstoqueByTenant(tenant) {
 
 async function relatorioProdutosSemCodigo() {
   return; //vou executar diretamente no frontend
-  TMongo.close();
+
   let tenants = await mpkIntegracaoController.findAll(filterTiny);
   const c = await TMongo.connect();
   let key = "relatorioProdutosSemCodigo";

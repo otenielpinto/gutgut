@@ -40,7 +40,7 @@ async function importarPedidosVendasTiny() {
 
   for (const tenant of tenants) {
     const tiny = new Tiny({ token: tenant?.token });
-    tiny.setTimeout(50000); //60 segundos
+    tiny.setTimeout(30000); //30 segundos
     const tintyInfo = new TinyInfo({ instance: tiny });
     let dataInicial = await tintyInfo.getDataInicialPedidos();
     const pageCount = await tintyInfo.getPaginasPedidos(dataInicial);
@@ -63,7 +63,12 @@ async function importarPedidosVendasTiny() {
               tenant.id_tenant,
               pedidos
             );
-            await salvarPedidosVenda({ pedidosVendas: pedidos, tiny });
+            try {
+              await salvarPedidosVenda({ pedidosVendas: pedidos, tiny });
+            } catch (error) {
+              console.log(`Erro ao salvar pedidos: ${error.message}`);
+            }
+
             break;
           }
         } catch (error) {
@@ -177,6 +182,12 @@ async function salvarPedidosVenda({ pedidosVendas = [], tiny = null } = {}) {
       console.log(
         `Situação do pedido não permite importação .${numero} ${situacao} ==>Sit.Atual:${situacao}`
       );
+
+      /**
+       * se o pedido já existir no banco, devo atualizar o status para cancelado
+       * devo cancelar os produtos que foram reservados para esse pedido
+       */
+
       continue;
     }
 

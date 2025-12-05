@@ -19,7 +19,6 @@ async function processarProdutoSemCodigo() {
 }
 
 async function processarProdutoSemCodigoByTenant(tenant) {
-  await TMongo.close();
   const c = await TMongo.connect();
   const produtoSemCodigoRepository = new ProdutoSemCodigoRepository(c);
   let tiny = new Tiny({ token: tenant.token });
