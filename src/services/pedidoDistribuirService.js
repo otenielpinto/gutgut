@@ -32,22 +32,31 @@ export class PedidoDistribuirService {
       return;
     }
 
-    const pedidos = new Set();
-    let hasEstoque = 0;
+    const loja_deposito = 1;
+    const solicitado = 1;
+    const nao_solicitado = 2;
 
-    // Verificar se algum item tem estoque disponível
+    const pedidos = new Set();
+    let hasEstoque = [];
+
+    //preciso registrar se tem estoque em alguma loja
     for (const item of items) {
-      if (item.status_loja === 1) {
-        hasEstoque = 1;
-        break;
+      if (item.status_loja === solicitado) {
+        hasEstoque.push(item.codigo);
       }
     }
 
     for (const item of items) {
       let payload = { status: status_distribuido };
       let pedidoId = item?.pedido?.id || null;
+      let codigo = item.codigo;
 
-      //aqui eu posso mudar o status para solicitar em todas as lojas
+      //preciso validar o item esta registrado como sem estoque
+      if (!hasEstoque.includes(codigo)) {
+        if (item.id_tenant == loja_deposito) {
+          item.status_loja = solicitado; //forçar a enviar mesmo sem estoque
+        }
+      }
       let response = await this.pedidoDistribuir.update(item.id, item);
 
       if (!response) {
@@ -56,11 +65,6 @@ export class PedidoDistribuirService {
         );
       } else {
         if (!pedidos.has(pedidoId)) {
-          if (hasEstoque === 0) {
-            payload.sub_status = 500; // Indica falta de estoque em algum item
-            payload.obs_logistica = "ATENCAO";
-          }
-
           try {
             await this.pedidoVendaRepository.update(pedidoId, payload);
             pedidos.add(pedidoId);
@@ -159,6 +163,7 @@ export class PedidoDistribuirService {
         d.numero_pedido = pedido?.numero || "";
         d.numero_ecommerce = pedido?.numero_ecommerce || "";
         d.nome_ecommerce = pedido?.ecommerce?.nomeEcommerce || "";
+        d.id_pedido = pedido?.id || "";
       }
       items_movto.push(...distribuicao.items);
 
@@ -177,10 +182,29 @@ export class PedidoDistribuirService {
     await this.distribuirPedido(items_movto);
   }
 
+  ajustarCodigoLoja(codigo_loja) {
+    // Ajusta o código da loja conforme necessário gutgut.cx
+
+    if (codigo_loja.toLowerCase().startsWith(prefixoEmpresa + ".")) {
+      codigo_loja = codigo_loja.substring(prefixoEmpresa.length + 1);
+    }
+    //retornar em maisculo e sem espaços
+    return codigo_loja.trim().toUpperCase();
+  }
+
   async distribuicaoCondicional(codigo, estoques, quantidade) {
     let items = [];
     let estoqueDeposito = estoques?.depositos || [];
     let quantidadeRestante = quantidade;
+
+    //quero gerar um array com os códigos das lojas + saldo
+    let depositos = estoqueDeposito.map((d) => ({
+      empresa: this.ajustarCodigoLoja(d?.deposito?.empresa),
+      saldo: parseFloat(d?.deposito?.saldo || 0),
+    }));
+    if (!Array.isArray(depositos)) {
+      depositos = [];
+    }
 
     let produtos = await this.getProdutosByCodigo(codigo);
     let lojas = await this.getTenantsByProximidade();
@@ -246,7 +270,7 @@ export class PedidoDistribuirService {
           id_produto: produto_id,
           codigo: codigo,
           id_tenant: loja.id,
-          codigo_loja: _empresa,
+          codigo_loja: loja.codigo,
           status_loja: 1,
           quantidade: quantidadeRetirada,
           qtd_enviada: 0,
@@ -257,6 +281,8 @@ export class PedidoDistribuirService {
           dt_movto: new Date(),
           url_produto: url_produto,
           qtd_carrinho: 0,
+          depositos,
+          obs_logistica: "",
         });
 
         console.log(
@@ -273,7 +299,7 @@ export class PedidoDistribuirService {
           id_produto: produto_id,
           codigo: codigo,
           id_tenant: loja.id,
-          codigo_loja: _empresa,
+          codigo_loja: loja.codigo,
           status_loja: 2,
           quantidade: 0,
           qtd_enviada: 0,
@@ -284,6 +310,8 @@ export class PedidoDistribuirService {
           dt_movto: new Date(),
           url_produto: url_produto,
           qtd_carrinho: 0,
+          depositos,
+          obs_logistica: "",
         });
       }
     }
