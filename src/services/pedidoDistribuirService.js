@@ -214,6 +214,7 @@ export class PedidoDistribuirService {
 
     let lojas = await this.getTenantsByProximidade();
     // Atribuir nivel_proximidade aos depositos baseado nas lojas
+
     depositos.forEach((dep, index) => {
       const d = depositos[index];
       const loja = lojas.find((l) => l.codigo === d.empresa);
@@ -224,6 +225,7 @@ export class PedidoDistribuirService {
     depositos = depositos.sort(
       (a, b) => a.nivel_proximidade - b.nivel_proximidade
     );
+
     let produtos = await this.getProdutosByCodigo(codigo);
     let url_produto = "";
 
