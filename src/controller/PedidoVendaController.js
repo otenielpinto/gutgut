@@ -165,15 +165,19 @@ async function addEcommerce({ nome_ecommerce = "", id_tenant = 0 } = {}) {
 
     console.log(`Canal de venda adicionado: ${nome_ecommerce}`);
     const rep = new CanalVendaRepository(id_tenant);
+
+    const exists = await rep.findOne({ nome: nome_ecommerce });
+    if (exists) {
+      return null;
+    }
+
     const obj = {
       id: lib.newUUId(),
       nome: nome_ecommerce,
       id_tenant: id_tenant,
       id_empresa: id_tenant,
-      created_at: new Date(),
-      updated_at: new Date(),
     };
-    await rep.update(obj.id, obj);
+    await rep.create(obj.id, obj);
     return obj;
   }
   return null;
