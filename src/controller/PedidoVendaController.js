@@ -271,11 +271,13 @@ async function salvarPedidosVenda({ pedidosVendas = [], tiny = null } = {}) {
 
         //cadastrar o nome do ecommerce na tabela de canal de vendas
         try {
-          await addEcommerce(
-            pedido?.ecommerce?.nomeEcommerce || "",
-            pedido?.id_tenant || 0
-          );
-        } catch (error) {}
+          await addEcommerce({
+            nome_ecommerce: pedido?.ecommerce?.nomeEcommerce || "",
+            id_tenant: pedido?.id_tenant || 0,
+          });
+        } catch (error) {
+          console.log(`Erro ao adicionar canal de venda: ${error.message}`);
+        }
       }
     }
   }
