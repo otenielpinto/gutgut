@@ -155,7 +155,8 @@ async function importarPedidosVendasDataAtualizacao() {
   }
 }
 
-async function addEcommerce({ nome_ecommerce = "", id_tenant = 0 } = {}) {
+async function addEcommerce({ nome_ecommerce, id_tenant } = {}) {
+  console.log("nome do ecommerce-->", nome_ecommerce);
   if (!nome_ecommerce || nome_ecommerce.trim() === "") {
     return null;
   }
@@ -177,7 +178,7 @@ async function addEcommerce({ nome_ecommerce = "", id_tenant = 0 } = {}) {
       id_tenant: id_tenant,
       id_empresa: id_tenant,
     };
-    await rep.create(obj.id, obj);
+    await rep.create(obj);
     return obj;
   }
   return null;
