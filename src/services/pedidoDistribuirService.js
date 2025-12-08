@@ -184,6 +184,9 @@ export class PedidoDistribuirService {
 
   ajustarCodigoLoja(codigo_loja) {
     // Ajusta o código da loja conforme necessário gutgut.cx
+    if (codigo_loja.toLowerCase() === nomeEmpresa) {
+      return "GP";
+    }
 
     if (codigo_loja.toLowerCase().startsWith(prefixoEmpresa + ".")) {
       codigo_loja = codigo_loja.substring(prefixoEmpresa.length + 1);
@@ -198,16 +201,30 @@ export class PedidoDistribuirService {
     let quantidadeRestante = quantidade;
 
     //quero gerar um array com os códigos das lojas + saldo
-    let depositos = estoqueDeposito.map((d) => ({
-      empresa: this.ajustarCodigoLoja(d?.deposito?.empresa),
-      saldo: parseFloat(d?.deposito?.saldo || 0),
-    }));
+    let depositos = estoqueDeposito
+      .filter((d) => d?.deposito?.desconsiderar !== "S")
+      .map((d) => ({
+        empresa: this.ajustarCodigoLoja(d?.deposito?.empresa),
+        saldo: parseFloat(d?.deposito?.saldo || 0),
+        nivel_proximidade: 0,
+      }));
     if (!Array.isArray(depositos)) {
       depositos = [];
     }
 
-    let produtos = await this.getProdutosByCodigo(codigo);
     let lojas = await this.getTenantsByProximidade();
+    // Atribuir nivel_proximidade aos depositos baseado nas lojas
+    depositos.forEach((dep, index) => {
+      const d = depositos[index];
+      const loja = lojas.find((l) => l.codigo === d.empresa);
+      dep.nivel_proximidade = loja ? loja.nivel_proximidade : 999;
+    });
+
+    // Ordenar depositos por nivel_proximidade
+    depositos = depositos.sort(
+      (a, b) => a.nivel_proximidade - b.nivel_proximidade
+    );
+    let produtos = await this.getProdutosByCodigo(codigo);
     let url_produto = "";
 
     for (const loja of lojas) {
