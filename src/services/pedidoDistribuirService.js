@@ -219,6 +219,11 @@ export class PedidoDistribuirService {
       const d = depositos[index];
       const loja = lojas.find((l) => l.codigo === d.empresa);
       dep.nivel_proximidade = loja ? loja.nivel_proximidade : 999;
+
+      //porque GP ja desconta do estoque
+      if (loja?.importar_pedido === "1") {
+        dep.saldo = 0 + quantidade;
+      }
     });
 
     // Ordenar depositos por nivel_proximidade
