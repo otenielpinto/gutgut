@@ -203,11 +203,6 @@ async function salvarPedidosVenda({ pedidosVendas = [], tiny = null } = {}) {
     let situacao = pedidoVenda?.situacao || "";
     let numero = pedidoVenda?.numero || "";
     let numero_ecommerce = pedidoVenda?.numero_ecommerce || "";
-    let nome_ecommerce = pedidoVenda?.ecommerce?.nomeEcommerce || "";
-    let id_tenant = pedidoVenda?.id_tenant || 0;
-    try {
-      await addEcommerce(nome_ecommerce, id_tenant);
-    } catch (error) {}
 
     if (!numero_ecommerce || numero_ecommerce.trim() === "") {
       console.log(
@@ -221,6 +216,13 @@ async function salvarPedidosVenda({ pedidosVendas = [], tiny = null } = {}) {
       situacao == situacao_dados_incompletos ||
       situacao == situacao_cancelado
     ) {
+      if (situacao == situacao_dados_incompletos) {
+        console.log(
+          `Pedido ${numero} com situação de dados incompletos. Ignorando importação.`
+        );
+        continue;
+      }
+
       //Shopee só libera os dados completos apos o pagamento ser realizado no Shopee
       console.log(
         `Situação do pedido não permite importação .${numero} ${situacao} ==>Sit.Atual:${situacao}`
@@ -231,11 +233,13 @@ async function salvarPedidosVenda({ pedidosVendas = [], tiny = null } = {}) {
        * devo cancelar os produtos que foram reservados para esse pedido
        */
 
-      await repository.update(pedidoVenda?.id, {
-        situacao: 2,
-        situacao: situacao,
-      });
-      //falta cancelar os produtos reservados para esse pedido
+      const exists = await repository.findById(pedidoVenda?.id);
+      if (exists) {
+        await repository.update(pedidoVenda?.id, {
+          situacao: 2,
+          situacao: situacao,
+        });
+      }
 
       continue;
     }
@@ -257,12 +261,21 @@ async function salvarPedidosVenda({ pedidosVendas = [], tiny = null } = {}) {
       if (tiny.status() == "OK") {
         let pedido = await tiny.tratarRetorno(response, "pedido");
         pedido = { ...pedidoVenda, ...pedido };
+
         await repository.create({
           ...pedido,
           status: 1,
           sub_status: 0,
           obs_logistica: "",
         });
+
+        //cadastrar o nome do ecommerce na tabela de canal de vendas
+        try {
+          await addEcommerce(
+            pedido?.ecommerce?.nomeEcommerce || "",
+            pedido?.id_tenant || 0
+          );
+        } catch (error) {}
       }
     }
   }
