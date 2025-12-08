@@ -2,6 +2,8 @@ import { Tiny, TinyInfo } from "../services/tinyService.js";
 import { MpkIntegracaoNewRepository } from "../repository/mpkIntegracaoNewRepository.js";
 import { PedidoVendaRepository } from "../repository/pedidoVendaRepository.js";
 import { lib } from "../utils/lib.js";
+import { CanalVendaRepository } from "../repository/canalVendaRepository.js";
+const LIST_CANAL_VENDA = [];
 
 const situacao_aberto = "Em aberto";
 const situacao_aprovado = "Aprovado";
@@ -153,6 +155,30 @@ async function importarPedidosVendasDataAtualizacao() {
   }
 }
 
+async function addEcommerce({ nome_ecommerce = "", id_tenant = 0 } = {}) {
+  if (!nome_ecommerce || nome_ecommerce.trim() === "") {
+    return null;
+  }
+
+  if (!LIST_CANAL_VENDA.includes(nome_ecommerce)) {
+    LIST_CANAL_VENDA.push(nome_ecommerce);
+
+    console.log(`Canal de venda adicionado: ${nome_ecommerce}`);
+    const rep = new CanalVendaRepository(id_tenant);
+    const obj = {
+      id: lib.newUUId(),
+      nome: nome_ecommerce,
+      id_tenant: id_tenant,
+      id_empresa: id_tenant,
+      created_at: new Date(),
+      updated_at: new Date(),
+    };
+    await rep.update(obj.id, obj);
+    return obj;
+  }
+  return null;
+}
+
 /**
  * Salva os pedidos de venda no banco de dados ( Tem que vir desustrurado do Tiny )
  *
@@ -173,6 +199,11 @@ async function salvarPedidosVenda({ pedidosVendas = [], tiny = null } = {}) {
     let situacao = pedidoVenda?.situacao || "";
     let numero = pedidoVenda?.numero || "";
     let numero_ecommerce = pedidoVenda?.numero_ecommerce || "";
+    let nome_ecommerce = pedidoVenda?.ecommerce?.nomeEcommerce || "";
+    let id_tenant = pedidoVenda?.id_tenant || 0;
+    try {
+      await addEcommerce(nome_ecommerce, id_tenant);
+    } catch (error) {}
 
     if (!numero_ecommerce || numero_ecommerce.trim() === "") {
       console.log(
