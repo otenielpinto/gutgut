@@ -222,7 +222,7 @@ export class PedidoDistribuirService {
 
       //porque GP ja desconta do estoque
       if (loja?.importar_pedido === "1") {
-        dep.saldo = 0 + quantidade;
+        dep.saldo = parseFloat(dep?.saldo || 0) + quantidade;
       }
     });
 

@@ -3,6 +3,7 @@ import { MpkIntegracaoNewRepository } from "../repository/mpkIntegracaoNewReposi
 import { PedidoVendaRepository } from "../repository/pedidoVendaRepository.js";
 import { lib } from "../utils/lib.js";
 import { CanalVendaRepository } from "../repository/canalVendaRepository.js";
+import { PedidoDistribuirRepository } from "../repository/pedidoDistribuirRepository.js";
 const LIST_CANAL_VENDA = [];
 
 const situacao_aberto = "Em aberto";
@@ -199,6 +200,7 @@ async function salvarPedidosVenda({ pedidosVendas = [], tiny = null } = {}) {
     return;
   }
   const repository = new PedidoVendaRepository();
+  const pedidoDistribuir = new PedidoDistribuirRepository();
 
   for (const pedidoVenda of pedidosVendas) {
     let situacao = pedidoVenda?.situacao || "";
@@ -236,10 +238,19 @@ async function salvarPedidosVenda({ pedidosVendas = [], tiny = null } = {}) {
 
       const exists = await repository.findById(pedidoVenda?.id);
       if (exists) {
-        await repository.update(pedidoVenda?.id, {
-          situacao: 2,
-          situacao: situacao,
-        });
+        try {
+          await repository.update(pedidoVenda?.id, {
+            status: 2,
+            situacao: situacao,
+          });
+        } finally {
+          //deletar os produtos reservados para esse pedido
+          console.log(
+            "Deletando produtos reservados para o pedido cancelado:",
+            pedidoVenda?.id
+          );
+          await pedidoDistribuir.deleteMany({ id_pedido: pedidoVenda?.id });
+        }
       }
 
       continue;
