@@ -239,12 +239,8 @@ async function salvarPedidosVenda({ pedidosVendas = [], tiny = null } = {}) {
       const exists = await repository.findById(pedidoVenda?.id);
       if (exists) {
         try {
-          await repository.update(pedidoVenda?.id, {
-            status: 2,
-            situacao: situacao,
-          });
+          await repository.delete(pedidoVenda?.id);
         } finally {
-          //deletar os produtos reservados para esse pedido
           console.log(
             "Deletando produtos reservados para o pedido cancelado:",
             pedidoVenda?.id
