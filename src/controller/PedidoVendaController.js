@@ -174,7 +174,7 @@ async function addEcommerce({ nome_ecommerce, id_tenant } = {}) {
     }
 
     const obj = {
-      id: lib.newUUId(),
+      id: await lib.newUUId(),
       nome: nome_ecommerce,
       id_tenant: id_tenant,
       id_empresa: id_tenant,

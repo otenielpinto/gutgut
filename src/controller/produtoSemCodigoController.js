@@ -72,7 +72,7 @@ async function processarProdutoSemCodigoByTenant(tenant) {
 
     response.sequencia = "1";
     response.marca = "inativo";
-    response.nome = nome + " - " + lib.newUUId();
+    response.nome = nome + " - " + (await lib.newUUId());
     data = [{ key: "produto", value: { produtos: [{ produto: response }] } }];
     response = await tiny.post("produto.alterar.php", data);
     if (response?.data?.retorno?.status == "OK") {
