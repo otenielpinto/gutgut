@@ -4,6 +4,7 @@ import { PedidoVendaRepository } from "../repository/pedidoVendaRepository.js";
 import { lib } from "../utils/lib.js";
 import { CanalVendaRepository } from "../repository/canalVendaRepository.js";
 import { PedidoDistribuirRepository } from "../repository/pedidoDistribuirRepository.js";
+import { systemService } from "../services/systemService.js";
 const LIST_CANAL_VENDA = [];
 
 const situacao_aberto = "Em aberto";
@@ -20,6 +21,7 @@ const situacao_dados_incompletos = "Dados incompletos";
 async function init() {
   await importarPedidosVendasTiny();
   await importarPedidosVendasDataAtualizacao();
+  await limparPedidosDistribuirAntigos();
 }
 
 async function criarCamposExtrasPedidoVenda(id_tenant, pedidos = []) {
@@ -186,6 +188,51 @@ async function addEcommerce({ nome_ecommerce, id_tenant } = {}) {
 }
 
 /**
+ * Limpa pedidos distribuir com updated_at superior a 3 dias
+ * Executa apenas uma vez por dia usando systemService.started()
+ *
+ * @returns {Promise<void>}
+ */
+async function limparPedidosDistribuirAntigos() {
+  const tenants = await new MpkIntegracaoNewRepository().findAll({
+    importar_pedido: "1",
+  });
+
+  for (const tenant of tenants) {
+    const key = `limpar_pedidos_distribuir_${tenant.id_tenant}`;
+
+    if ((await systemService.started(tenant.id_tenant, key)) == 1) {
+      console.log(
+        `Limpeza de pedidos distribuir já realizada para o tenant ${tenant.id_tenant}`
+      );
+      continue;
+    }
+
+    try {
+      // Calcula data limite (hoje - 3 dias)
+      const dataLimite = new Date(lib.addDays(new Date(), -3));
+
+      const pedidoDistribuir = new PedidoDistribuirRepository(tenant.id_tenant);
+
+      // Deleta registros com updated_at anterior a 3 dias
+      const resultado = await pedidoDistribuir.deleteMany({
+        updated_at: { $lt: dataLimite },
+      });
+
+      console.log(
+        `Pedidos distribuir antigos removidos para tenant ${
+          tenant.id_tenant
+        }: ${resultado?.deletedCount || 0} registros`
+      );
+    } catch (error) {
+      console.log(
+        `Erro ao limpar pedidos distribuir antigos para tenant ${tenant.id_tenant}: ${error.message}`
+      );
+    }
+  }
+}
+
+/**
  * Salva os pedidos de venda no banco de dados ( Tem que vir desustrurado do Tiny )
  *
  * @param {*} pedidosVendas
@@ -213,7 +260,7 @@ async function salvarPedidosVenda({ pedidosVendas = [], tiny = null } = {}) {
       );
       continue;
     }
-
+    console.log(situacao, numero, numero_ecommerce);
     //Critério para importar pedido  para shopee
     if (
       situacao == situacao_dados_incompletos ||
@@ -295,6 +342,7 @@ const PedidoVendaController = {
   init,
   importarPedidosVendasTiny,
   salvarPedidosVenda,
+  limparPedidosDistribuirAntigos,
 };
 
 export { PedidoVendaController };
