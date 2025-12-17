@@ -5,7 +5,8 @@ import { lib } from "../utils/lib.js";
 import { CanalVendaRepository } from "../repository/canalVendaRepository.js";
 import { PedidoDistribuirRepository } from "../repository/pedidoDistribuirRepository.js";
 import { systemService } from "../services/systemService.js";
-const LIST_CANAL_VENDA = [];
+let LIST_CANAL_VENDA = [];
+let PEDIDOS_PARA_REMOVER = [];
 
 const situacao_aberto = "Em aberto";
 const situacao_aprovado = "Aprovado";
@@ -22,6 +23,7 @@ async function init() {
   await importarPedidosVendasTiny();
   await importarPedidosVendasDataAtualizacao();
   await limparPedidosDistribuirAntigos();
+  await limparPedidosEntregues();
 }
 
 async function criarCamposExtrasPedidoVenda(id_tenant, pedidos = []) {
@@ -233,6 +235,49 @@ async function limparPedidosDistribuirAntigos() {
 }
 
 /**
+ * Adiciona pedido à lista de controle se não existir
+ * Mantém lista com máximo de 1000 registros
+ *
+ * @param {string} situacao - Situação do pedido
+ * @param {string} id_pedido - ID do pedido
+ * @returns {Promise<void>}
+ */
+async function adicionarPedidoParaRemocao({ situacao, id_pedido }) {
+  // Verifica se situação é válida
+  const situacoesValidas = [
+    situacao_pronto_envio,
+    situacao_enviado,
+    situacao_entregue,
+  ];
+
+  if (!situacoesValidas.includes(situacao)) {
+    console.log(
+      `Situação ${situacao} não permitida para o pedido ${id_pedido}`
+    );
+    return;
+  }
+
+  // Verifica se pedido já existe na lista
+  if (PEDIDOS_PARA_REMOVER.includes(id_pedido)) {
+    return;
+  }
+
+  // Adiciona novo pedido
+  PEDIDOS_PARA_REMOVER.push(id_pedido);
+  console.log(
+    `Pedido ${id_pedido} (${situacao}) adicionado para remoção futura`
+  );
+
+  // Limita lista a 1000 registros
+  if (PEDIDOS_PARA_REMOVER.length > 1000) {
+    const removido = PEDIDOS_PARA_REMOVER.shift();
+    console.log(
+      `Lista de pedidos cheia - Removido pedido mais antigo: ${removido}`
+    );
+  }
+}
+
+/**
  * Salva os pedidos de venda no banco de dados ( Tem que vir desustrurado do Tiny )
  *
  * @param {*} pedidosVendas
@@ -301,39 +346,117 @@ async function salvarPedidosVenda({ pedidosVendas = [], tiny = null } = {}) {
 
     const exists = await repository.findById(pedidoVenda?.id);
     if (exists) {
+      await adicionarPedidoParaRemocao({
+        situacao,
+        id_pedido: pedidoVenda?.id,
+      });
       continue;
     }
 
-    if (exists) {
-      //atualizar
-      //await repository.update(pedidoVenda?.id, pedidoVenda);
-    } else {
-      await lib.sleep(1000 * 3); //para nao estourar o limite de requisicoes
-      //inserir
-      let response = await tiny.post("pedido.obter.php", [
-        { key: "id", value: pedidoVenda?.id },
-      ]);
-      if (tiny.status() == "OK") {
-        let pedido = await tiny.tratarRetorno(response, "pedido");
-        pedido = { ...pedidoVenda, ...pedido };
+    await lib.sleep(1000 * 3); //para nao estourar o limite de requisicoes
+    //**************************************************** */
+    let response = await tiny.post("pedido.obter.php", [
+      { key: "id", value: pedidoVenda?.id },
+    ]);
+    if (tiny.status() == "OK") {
+      let pedido = await tiny.tratarRetorno(response, "pedido");
+      pedido = { ...pedidoVenda, ...pedido };
 
-        await repository.create({
-          ...pedido,
-          status: 1,
-          sub_status: 0,
-          obs_logistica: "",
+      await repository.create({
+        ...pedido,
+        status: 1,
+        sub_status: 0,
+        obs_logistica: "",
+      });
+
+      //cadastrar o nome do ecommerce na tabela de canal de vendas
+      try {
+        await addEcommerce({
+          nome_ecommerce: pedido?.ecommerce?.nomeEcommerce || "",
+          id_tenant: pedido?.id_tenant || 0,
+        });
+      } catch (error) {
+        console.log(`Erro ao adicionar canal de venda: ${error.message}`);
+      }
+    }
+    //**************************************************** */
+  }
+}
+
+/**
+ * Limpa pedidos entregues (pronto para envio, enviado ou entregue) e,
+ * além disso, remove da collection `pedido_distribuir` os pedidos que
+ * foram marcados na lista global `PEDIDOS_PARA_REMOVER`.
+ *
+ * Executa apenas uma vez por dia usando systemService.started()
+ *
+ * @returns {Promise<void>}
+ */
+async function limparPedidosEntregues() {
+  if (
+    !Array.isArray(PEDIDOS_PARA_REMOVER) ||
+    PEDIDOS_PARA_REMOVER.length === 0
+  ) {
+    console.log("Nenhum pedido para limpar.");
+    return;
+  }
+
+  const tenants = await new MpkIntegracaoNewRepository().findAll({
+    importar_pedido: "1",
+  });
+
+  for (const tenant of tenants) {
+    const key = `limpar_pedidos_entregues_${tenant.id_tenant}`;
+
+    // -------------------------------------------------------------
+    // 1️⃣  Verifica se a limpeza já foi feita hoje para este tenant
+    // -------------------------------------------------------------
+    if ((await systemService.started(tenant.id_tenant, key)) == 1) {
+      console.log(
+        `Limpeza de pedidos entregues já realizada para o tenant ${tenant.id_tenant}`
+      );
+      continue;
+    }
+
+    try {
+      // -------------------------------------------------------------
+      // 3️⃣  Se houver itens na lista de remoção, exclui da collection
+      //     `pedido_distribuir`
+      // -------------------------------------------------------------
+      if (
+        Array.isArray(PEDIDOS_PARA_REMOVER) &&
+        PEDIDOS_PARA_REMOVER.length > 0
+      ) {
+        const pedidoDistribuir = new PedidoDistribuirRepository(
+          tenant.id_tenant
+        );
+
+        // O Mongo aceita o operador `$in` para remover vários documentos de uma vez
+        const distribResult = await pedidoDistribuir.deleteMany({
+          id_pedido: { $in: PEDIDOS_PARA_REMOVER },
         });
 
-        //cadastrar o nome do ecommerce na tabela de canal de vendas
-        try {
-          await addEcommerce({
-            nome_ecommerce: pedido?.ecommerce?.nomeEcommerce || "",
-            id_tenant: pedido?.id_tenant || 0,
-          });
-        } catch (error) {
-          console.log(`Erro ao adicionar canal de venda: ${error.message}`);
-        }
+        console.log(
+          `Pedidos distribuídos removidos (lista de remoção) para tenant ${
+            tenant.id_tenant
+          }: ${distribResult?.deletedCount || 0} registros`
+        );
+
+        // Opcional: limpar a lista global para a próxima execução.
+        // Caso queira manter os IDs que **não** foram deletados, troque por:
+        //   PEDIDOS_PARA_REMOVER = PEDIDOS_PARA_REMOVER.filter(
+        //     id => !distribResult?.deletedIds?.includes(id)
+        //   );
+        PEDIDOS_PARA_REMOVER = [];
+      } else {
+        console.log(
+          `Nenhum pedido em PEDIDOS_PARA_REMOVER para o tenant ${tenant.id_tenant}.`
+        );
       }
+    } catch (error) {
+      console.log(
+        `Erro ao limpar pedidos entregues para o tenant ${tenant.id_tenant}: ${error.message}`
+      );
     }
   }
 }
@@ -343,6 +466,8 @@ const PedidoVendaController = {
   importarPedidosVendasTiny,
   salvarPedidosVenda,
   limparPedidosDistribuirAntigos,
+  limparPedidosEntregues,
+  adicionarPedidoParaRemocao,
 };
 
 export { PedidoVendaController };
