@@ -7,6 +7,7 @@ import { PedidoDistribuirRepository } from "../repository/pedidoDistribuirReposi
 import { systemService } from "../services/systemService.js";
 let LIST_CANAL_VENDA = [];
 let PEDIDOS_PARA_REMOVER = [];
+let ULTIMA_HORA_LIMPEZA_PEDIDOS_ENTREGUES = null;
 
 const situacao_aberto = "Em aberto";
 const situacao_aprovado = "Aprovado";
@@ -213,8 +214,8 @@ async function limparPedidosDistribuirAntigos() {
     try {
       // Calcula data limite (hoje - 3 dias)
       const dataLimite = new Date(lib.addDays(new Date(), -3));
-
-      const pedidoDistribuir = new PedidoDistribuirRepository(tenant.id_tenant);
+      //OBS : NAO PODE COLOCAR O PARAMETRO ID_TENANT , POIS A ORDEM É EXCLUIR TODOS OS REGISTROS
+      const pedidoDistribuir = new PedidoDistribuirRepository();
 
       // Deleta registros com updated_at anterior a 3 dias
       const resultado = await pedidoDistribuir.deleteMany({
@@ -243,14 +244,14 @@ async function limparPedidosDistribuirAntigos() {
  * @returns {Promise<void>}
  */
 async function adicionarPedidoParaRemocao({ situacao, id_pedido }) {
-  // Verifica se situação é válida
-  const situacoesValidas = [
-    situacao_pronto_envio,
-    situacao_enviado,
-    situacao_entregue,
+  //Se estiver dentro dessa situacao , não adiciona na lista de remoção
+  const situacoesValidasInvalidas = [
+    situacao_aberto,
+    situacao_aprovado,
+    situacao_preparando_envio,
   ];
 
-  if (!situacoesValidas.includes(situacao)) {
+  if (situacoesValidasInvalidas.includes(situacao)) {
     console.log(
       `Situação ${situacao} não permitida para o pedido ${id_pedido}`
     );
@@ -267,14 +268,6 @@ async function adicionarPedidoParaRemocao({ situacao, id_pedido }) {
   console.log(
     `Pedido ${id_pedido} (${situacao}) adicionado para remoção futura`
   );
-
-  // Limita lista a 1000 registros
-  if (PEDIDOS_PARA_REMOVER.length > 1000) {
-    const removido = PEDIDOS_PARA_REMOVER.shift();
-    console.log(
-      `Lista de pedidos cheia - Removido pedido mais antigo: ${removido}`
-    );
-  }
 }
 
 /**
@@ -392,7 +385,18 @@ async function salvarPedidosVenda({ pedidosVendas = [], tiny = null } = {}) {
  *
  * @returns {Promise<void>}
  */
+
 async function limparPedidosEntregues() {
+  // Obtém a hora atual (0-23)
+  const horaAtual = new Date().getHours();
+  if (ULTIMA_HORA_LIMPEZA_PEDIDOS_ENTREGUES === horaAtual) {
+    console.log(
+      `Limpeza de pedidos entregues já executada nesta hora (${horaAtual}h).`
+    );
+    return;
+  }
+  ULTIMA_HORA_LIMPEZA_PEDIDOS_ENTREGUES = horaAtual;
+
   if (
     !Array.isArray(PEDIDOS_PARA_REMOVER) ||
     PEDIDOS_PARA_REMOVER.length === 0
@@ -406,30 +410,17 @@ async function limparPedidosEntregues() {
   });
 
   for (const tenant of tenants) {
-    const key = `limpar_pedidos_entregues_${tenant.id_tenant}`;
-
-    // -------------------------------------------------------------
-    // 1️⃣  Verifica se a limpeza já foi feita hoje para este tenant
-    // -------------------------------------------------------------
-    if ((await systemService.started(tenant.id_tenant, key)) == 1) {
-      console.log(
-        `Limpeza de pedidos entregues já realizada para o tenant ${tenant.id_tenant}`
-      );
-      continue;
-    }
-
     try {
       // -------------------------------------------------------------
-      // 3️⃣  Se houver itens na lista de remoção, exclui da collection
+      //   Se houver itens na lista de remoção, exclui da collection
       //     `pedido_distribuir`
       // -------------------------------------------------------------
       if (
         Array.isArray(PEDIDOS_PARA_REMOVER) &&
         PEDIDOS_PARA_REMOVER.length > 0
       ) {
-        const pedidoDistribuir = new PedidoDistribuirRepository(
-          tenant.id_tenant
-        );
+        //nao pode enviar o tenant porque a ordem é excluir todo pedido
+        const pedidoDistribuir = new PedidoDistribuirRepository();
 
         // O Mongo aceita o operador `$in` para remover vários documentos de uma vez
         const distribResult = await pedidoDistribuir.deleteMany({
@@ -447,7 +438,6 @@ async function limparPedidosEntregues() {
         //   PEDIDOS_PARA_REMOVER = PEDIDOS_PARA_REMOVER.filter(
         //     id => !distribResult?.deletedIds?.includes(id)
         //   );
-        PEDIDOS_PARA_REMOVER = [];
       } else {
         console.log(
           `Nenhum pedido em PEDIDOS_PARA_REMOVER para o tenant ${tenant.id_tenant}.`
@@ -459,6 +449,8 @@ async function limparPedidosEntregues() {
       );
     }
   }
+
+  PEDIDOS_PARA_REMOVER = [];
 }
 
 const PedidoVendaController = {
