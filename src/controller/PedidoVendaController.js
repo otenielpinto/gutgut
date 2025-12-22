@@ -212,12 +212,12 @@ async function limparPedidosDistribuirAntigos() {
     }
 
     try {
-      // Calcula data limite (hoje - 3 dias)
-      const dataLimite = new Date(lib.addDays(new Date(), -3));
+      // Calcula data limite (hoje - 7 dias)
+      const dataLimite = new Date(lib.addDays(new Date(), -7));
       //OBS : NAO PODE COLOCAR O PARAMETRO ID_TENANT , POIS A ORDEM É EXCLUIR TODOS OS REGISTROS
       const pedidoDistribuir = new PedidoDistribuirRepository();
 
-      // Deleta registros com updated_at anterior a 3 dias
+      // Deleta registros com updated_at anterior a 7 dias
       const resultado = await pedidoDistribuir.deleteMany({
         updated_at: { $lt: dataLimite },
       });
