@@ -10,6 +10,7 @@ import nodeSchedule from "node-schedule";
 
 global.processandoNow = 0;
 global.hasPedido = 0;
+let restartJobs2 = 0;
 
 async function task() {
   global.processandoNow = 1;
@@ -70,10 +71,20 @@ async function init() {
     const time2 = 6; //tempo em minutos
     const job2 = nodeSchedule.scheduleJob(`*/${time2} * * * *`, async () => {
       if (global.hasPedido == 1) {
+        restartJobs2++;
         console.log(
           "Job Pedido Venda can't started [processing] " +
+            "Tentativa " +
+            restartJobs2 +
+            " - " +
             lib.currentDateTimeStr()
         );
+
+        if (restartJobs2 >= 10) {
+          console.log("Forçando reset do hasPedido de Pedido Venda");
+          global.hasPedido = 0;
+          restartJobs2 = 0;
+        }
         return;
       }
 
