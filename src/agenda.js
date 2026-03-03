@@ -6,6 +6,7 @@ import { devolucaoController } from "./controller/devolucaoController.js";
 import { produtoSemCodigoController } from "./controller/produtoSemCodigoController.js";
 import { PedidoVendaController } from "./controller/PedidoVendaController.js";
 import { PedidoDistribuirController } from "./controller/pedidoDistribuirController.js";
+import { produtoUrlController } from "./controller/produtoUrlController.js";
 import nodeSchedule from "node-schedule";
 
 global.processandoNow = 0;
@@ -21,6 +22,7 @@ async function task() {
   await transferenciaController.init();
   await devolucaoController.init();
   await produtoSemCodigoController.init();
+  await produtoUrlController.init();
 
   global.processandoNow = 0;
   console.log(" Job finished - task " + lib.currentDateTimeStr());
@@ -44,6 +46,8 @@ async function init() {
   //await PedidoVendaController.init();
   //await PedidoDistribuirController.init();
   //console.log("Concluido " + lib.currentDateTimeStr());
+  //await produtoUrlController.init();
+
   //return;
 
   try {
@@ -51,7 +55,7 @@ async function init() {
     const job = nodeSchedule.scheduleJob(`*/${time} * * * *`, async () => {
       if (global.processandoNow == 1) {
         console.log(
-          " Job can't started [processing] " + lib.currentDateTimeStr()
+          " Job can't started [processing] " + lib.currentDateTimeStr(),
         );
         return;
       }
@@ -77,7 +81,7 @@ async function init() {
             "Tentativa " +
             restartJobs2 +
             " - " +
-            lib.currentDateTimeStr()
+            lib.currentDateTimeStr(),
         );
 
         if (restartJobs2 >= 10) {
