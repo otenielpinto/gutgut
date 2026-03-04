@@ -178,9 +178,9 @@ async function atualizarUrlsProdutosAutomaticamente(
     );
     await produtoUrlRepository.deleteMany({ id_tenant: id_tenant });
 
-    // Passo 3: Pausa de 10 segundos
-    console.log(`[ProdutoUrl] Aguardando 10 segundos antes de inserir...`);
-    await new Promise((resolve) => setTimeout(resolve, 10000));
+    // Passo 3: Pausa de 20 segundos
+    console.log(`[ProdutoUrl] Aguardando 20 segundos antes de inserir...`);
+    await new Promise((resolve) => setTimeout(resolve, 1000 * 20));
 
     // Passo 4: Inserir todos os registros de uma vez
     if (registrosParaInserir.length > 0) {
