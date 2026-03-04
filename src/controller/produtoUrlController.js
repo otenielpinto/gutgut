@@ -188,7 +188,6 @@ async function atualizarUrlsProdutosAutomaticamente(
         `[ProdutoUrl] Inserindo ${registrosParaInserir.length} registros...`,
       );
       await produtoUrlRepository.insertMany(registrosParaInserir);
-      console.log(registrosParaInserir);
     }
 
     await logService.saveLog({
