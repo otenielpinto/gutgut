@@ -68,6 +68,29 @@ class Repository {
     return result.insertedId;
   }
 
+  /**
+   * Tenta inserir o documento. Se o MongoDB recusar por chave duplicada
+   * (código E11000 / errorCode 11000), retorna null silenciosamente em vez de
+   * lançar exceção. Útil para prevenir duplicatas em cenários de concorrência.
+   *
+   * @param {object} payload - Documento a inserir
+   * @returns {*} insertedId em caso de sucesso, null se for duplicata
+   */
+  async createUnique(payload) {
+    try {
+      return await this.create(payload);
+    } catch (e) {
+      const isDuplicate = e?.code === 11000 || e?.errorCode === 11000;
+      if (isDuplicate) {
+        console.log(
+          `[createUnique] Documento duplicado ignorado na collection "${this.collectionName}". id=${payload?.id}`,
+        );
+        return null;
+      }
+      throw e;
+    }
+  }
+
   async update(id, payload) {
     const collection = await this.getCollection();
     const data = this._addTenantFilter({ ...payload });
@@ -88,7 +111,7 @@ class Repository {
     const result = await collection.updateOne(
       filter,
       { $set: data },
-      { upsert: true }
+      { upsert: true },
     );
     return result;
   }

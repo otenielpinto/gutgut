@@ -84,7 +84,7 @@ async function init() {
             lib.currentDateTimeStr(),
         );
 
-        if (restartJobs2 >= 10) {
+        if (restartJobs2 >= 15) {
           console.log("Forçando reset do hasPedido de Pedido Venda");
           global.hasPedido = 0;
           restartJobs2 = 0;
@@ -93,11 +93,20 @@ async function init() {
       }
 
       global.hasPedido = 1;
+      restartJobs2 = 0; // zera contador a cada execução iniciada
       try {
         console.log("Job Pedido Venda start as " + lib.currentDateTimeStr());
         await PedidoVendaController.init();
       } finally {
-        await PedidoDistribuirController.init();
+        // PedidoDistribuirController é envolvido em try/catch próprio para garantir
+        // que global.hasPedido = 0 SEMPRE execute, mesmo que init() lance exceção.
+        try {
+          await PedidoDistribuirController.init();
+        } catch (errDistribuir) {
+          console.log(
+            `Erro em PedidoDistribuirController.init(): ${errDistribuir.message}`,
+          );
+        }
         global.hasPedido = 0;
       }
     });

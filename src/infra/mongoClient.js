@@ -44,9 +44,28 @@ async function newConnection() {
   return localclient.db(process.env.MONGO_DATABASE);
 }
 
+/**
+ * Garante que os índices críticos existam no banco.
+ * Deve ser chamado uma vez durante a inicialização da aplicação.
+ * O índice único em tmp_pedido_venda.id previne pedidos duplicados
+ * mesmo em cenários de execução concorrente.
+ */
+async function ensureIndexes() {
+  try {
+    const db = await connect();
+    await db
+      .collection("tmp_pedido_venda")
+      .createIndex({ id: 1 }, { unique: true, name: "idx_unique_pedido_id" });
+    console.log("[ensureIndexes] Índice único tmp_pedido_venda.id garantido.");
+  } catch (error) {
+    console.log(`[ensureIndexes] Erro ao criar índices: ${error.message}`);
+  }
+}
+
 export const TMongo = {
   connect,
   disconnect,
   newConnection,
   close,
+  ensureIndexes,
 };

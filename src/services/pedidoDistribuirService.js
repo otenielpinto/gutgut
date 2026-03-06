@@ -61,7 +61,7 @@ export class PedidoDistribuirService {
 
       if (!response) {
         console.log(
-          `Erro ao distribuir o item ${item.codigo} do pedido ${pedidoId}`
+          `Erro ao distribuir o item ${item.codigo} do pedido ${pedidoId}`,
         );
       } else {
         if (!pedidos.has(pedidoId)) {
@@ -70,7 +70,7 @@ export class PedidoDistribuirService {
             pedidos.add(pedidoId);
           } catch (error) {
             console.log(
-              `Erro ao atualizar o status do pedido ${pedidoId}: ${error.message}`
+              `Erro ao atualizar o status do pedido ${pedidoId}: ${error.message}`,
             );
           }
         }
@@ -155,7 +155,7 @@ export class PedidoDistribuirService {
       const distribuicao = await this.distribuicaoCondicional(
         prod?.codigo,
         estoques,
-        quantidade
+        quantidade,
       );
 
       for (const d of distribuicao.items) {
@@ -172,7 +172,7 @@ export class PedidoDistribuirService {
         console.log(`Produto ${prod?.codigo}: Distribuição completa`);
       } else {
         console.log(
-          `Produto ${prod?.codigo}: Distribuição parcial. Faltam ${distribuicao.quantidadeRestante} unidades`
+          `Produto ${prod?.codigo}: Distribuição parcial. Faltam ${distribuicao.quantidadeRestante} unidades`,
         );
       }
     }
@@ -228,7 +228,7 @@ export class PedidoDistribuirService {
 
     // Ordenar depositos por nivel_proximidade
     depositos = depositos.sort(
-      (a, b) => a.nivel_proximidade - b.nivel_proximidade
+      (a, b) => a.nivel_proximidade - b.nivel_proximidade,
     );
 
     let produtos = await this.getProdutosByCodigo(codigo);
@@ -254,14 +254,14 @@ export class PedidoDistribuirService {
       }
 
       let dep = estoqueDeposito.find(
-        (dep) => dep?.deposito?.empresa === _empresa
+        (dep) => dep?.deposito?.empresa === _empresa,
       );
       if (dep) {
         saldoLoja = parseFloat(dep?.deposito?.saldo || 0) + quantidadeDeposito;
       }
 
       let produtoInfo = produtos.find(
-        (p) => p.id_tenant === loja.id && p.codigo === codigo
+        (p) => p.id_tenant === loja.id && p.codigo === codigo,
       );
 
       if (produtoInfo) {
@@ -311,12 +311,12 @@ export class PedidoDistribuirService {
 
         console.log(
           `Loja ${loja.codigo}: Retirado ${quantidadeRetirada} de ${saldoLoja} disponível. Restante: ${quantidadeRestante}`,
-          codigo
+          codigo,
         );
       } else {
         console.log(
           "Saldo da loja " + loja.codigo + ": " + saldoLoja + " (sem estoque)",
-          codigo
+          codigo,
         );
 
         items.push({
@@ -343,11 +343,11 @@ export class PedidoDistribuirService {
     // Verificar se foi possível suprir toda a quantidade solicitada
     if (quantidadeRestante > 0) {
       console.log(
-        `ATENÇÃO: Não foi possível suprir toda a quantidade solicitada. Faltam ${quantidadeRestante} unidades do produto ${codigo}`
+        `ATENÇÃO: Não foi possível suprir toda a quantidade solicitada. Faltam ${quantidadeRestante} unidades do produto ${codigo}`,
       );
     } else {
       console.log(
-        `Distribuição completa para o produto ${codigo}. Quantidade ${quantidade} totalmente suprida.`
+        `Distribuição completa para o produto ${codigo}. Quantidade ${quantidade} totalmente suprida.`,
       );
     }
 

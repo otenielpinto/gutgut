@@ -53,7 +53,7 @@ async function importarPedidosVendasTiny() {
     let dataInicial = await tintyInfo.getDataInicialPedidos();
     const pageCount = await tintyInfo.getPaginasPedidos(dataInicial);
     console.log(
-      `Importando pedidos por data de criação a partir de ${dataInicial} - Total de paginas: ${pageCount}`
+      `Importando pedidos por data de criação a partir de ${dataInicial} - Total de paginas: ${pageCount}`,
     );
 
     for (let page = 1; page <= pageCount; page++) {
@@ -69,7 +69,7 @@ async function importarPedidosVendasTiny() {
           if (tiny.status() == "OK") {
             pedidos = await criarCamposExtrasPedidoVenda(
               tenant.id_tenant,
-              pedidos
+              pedidos,
             );
             try {
               await salvarPedidosVenda({ pedidosVendas: pedidos, tiny });
@@ -83,11 +83,11 @@ async function importarPedidosVendasTiny() {
           console.log(
             `Erro ao buscar pedidos na pagina ${page}. Tentativa ${
               t + 1
-            } de 3. Erro: ${error.message}`
+            } de 3. Erro: ${error.message}`,
           );
           if (t == 2) {
             console.log(
-              `Falha ao buscar pedidos na pagina ${page} apos 3 tentativas. Pulando para a proxima pagina.`
+              `Falha ao buscar pedidos na pagina ${page} apos 3 tentativas. Pulando para a proxima pagina.`,
             );
           } else {
             await lib.sleep(10000); //espera 10 segundos antes de tentar novamente
@@ -110,12 +110,11 @@ async function importarPedidosVendasDataAtualizacao() {
     tiny.setTimeout(30000); //30 segundos
     const tintyInfo = new TinyInfo({ instance: tiny });
     let dataInicial = lib.formatDateBr(new Date());
-    const pageCount = await tintyInfo.getPaginasPedidosDataAtualizacao(
-      dataInicial
-    );
+    const pageCount =
+      await tintyInfo.getPaginasPedidosDataAtualizacao(dataInicial);
 
     console.log(
-      `Importando pedidos por data de atualização a partir de ${dataInicial} - Total de paginas: ${pageCount}`
+      `Importando pedidos por data de atualização a partir de ${dataInicial} - Total de paginas: ${pageCount}`,
     );
 
     if (!pageCount || pageCount === 0) {
@@ -136,7 +135,7 @@ async function importarPedidosVendasDataAtualizacao() {
           if (tiny.status() == "OK") {
             pedidos = await criarCamposExtrasPedidoVenda(
               tenant.id_tenant,
-              pedidos
+              pedidos,
             );
             await salvarPedidosVenda({ pedidosVendas: pedidos, tiny });
             break;
@@ -145,11 +144,11 @@ async function importarPedidosVendasDataAtualizacao() {
           console.log(
             `Erro ao buscar pedidos na pagina ${page}. Tentativa ${
               t + 1
-            } de 3. Erro: ${error.message}`
+            } de 3. Erro: ${error.message}`,
           );
           if (t == 2) {
             console.log(
-              `Falha ao buscar pedidos na pagina ${page} apos 3 tentativas. Pulando para a proxima pagina.`
+              `Falha ao buscar pedidos na pagina ${page} apos 3 tentativas. Pulando para a proxima pagina.`,
             );
           } else {
             await lib.sleep(10000); //espera 10 segundos antes de tentar novamente
@@ -206,7 +205,7 @@ async function limparPedidosDistribuirAntigos() {
 
     if ((await systemService.started(tenant.id_tenant, key)) == 1) {
       console.log(
-        `Limpeza de pedidos distribuir já realizada para o tenant ${tenant.id_tenant}`
+        `Limpeza de pedidos distribuir já realizada para o tenant ${tenant.id_tenant}`,
       );
       continue;
     }
@@ -225,11 +224,11 @@ async function limparPedidosDistribuirAntigos() {
       console.log(
         `Pedidos distribuir antigos removidos para tenant ${
           tenant.id_tenant
-        }: ${resultado?.deletedCount || 0} registros`
+        }: ${resultado?.deletedCount || 0} registros`,
       );
     } catch (error) {
       console.log(
-        `Erro ao limpar pedidos distribuir antigos para tenant ${tenant.id_tenant}: ${error.message}`
+        `Erro ao limpar pedidos distribuir antigos para tenant ${tenant.id_tenant}: ${error.message}`,
       );
     }
   }
@@ -253,7 +252,7 @@ async function adicionarPedidoParaRemocao({ situacao, id_pedido }) {
 
   if (situacoesValidasInvalidas.includes(situacao)) {
     console.log(
-      `Situação ${situacao} não permitida para o pedido ${id_pedido}`
+      `Situação ${situacao} não permitida para o pedido ${id_pedido}`,
     );
     return;
   }
@@ -266,7 +265,7 @@ async function adicionarPedidoParaRemocao({ situacao, id_pedido }) {
   // Adiciona novo pedido
   PEDIDOS_PARA_REMOVER.push(id_pedido);
   console.log(
-    `Pedido ${id_pedido} (${situacao}) adicionado para remoção futura`
+    `Pedido ${id_pedido} (${situacao}) adicionado para remoção futura`,
   );
 }
 
@@ -294,7 +293,7 @@ async function salvarPedidosVenda({ pedidosVendas = [], tiny = null } = {}) {
 
     if (!numero_ecommerce || numero_ecommerce.trim() === "") {
       console.log(
-        `Pedido sem número de ecommerce. Ignorando pedido. Pedido Número: ${numero}`
+        `Pedido sem número de ecommerce. Ignorando pedido. Pedido Número: ${numero}`,
       );
       continue;
     }
@@ -306,14 +305,14 @@ async function salvarPedidosVenda({ pedidosVendas = [], tiny = null } = {}) {
     ) {
       if (situacao == situacao_dados_incompletos) {
         console.log(
-          `Pedido ${numero} com situação de dados incompletos. Ignorando importação.`
+          `Pedido ${numero} com situação de dados incompletos. Ignorando importação.`,
         );
         continue;
       }
 
       //Shopee só libera os dados completos apos o pagamento ser realizado no Shopee
       console.log(
-        `Situação do pedido não permite importação .${numero} ${situacao} ==>Sit.Atual:${situacao}`
+        `Situação do pedido não permite importação .${numero} ${situacao} ==>Sit.Atual:${situacao}`,
       );
 
       /**
@@ -328,7 +327,7 @@ async function salvarPedidosVenda({ pedidosVendas = [], tiny = null } = {}) {
         } finally {
           console.log(
             "Deletando produtos reservados para o pedido cancelado:",
-            pedidoVenda?.id
+            pedidoVenda?.id,
           );
           await pedidoDistribuir.deleteMany({ id_pedido: pedidoVenda?.id });
         }
@@ -355,12 +354,22 @@ async function salvarPedidosVenda({ pedidosVendas = [], tiny = null } = {}) {
       let pedido = await tiny.tratarRetorno(response, "pedido");
       pedido = { ...pedidoVenda, ...pedido };
 
-      await repository.create({
+      // Usa createUnique para evitar duplicatas em caso de execuções concorrentes.
+      // O índice único { id: 1 } na collection tmp_pedido_venda garante a
+      // proteção a nível de banco; createUnique trata o erro E11000 com graceful skip.
+      const inserted = await repository.createUnique({
         ...pedido,
         status: 1,
         sub_status: 0,
         obs_logistica: "",
       });
+
+      if (!inserted) {
+        console.log(
+          `Pedido ${numero} (id=${pedidoVenda?.id}) já existe no banco (duplicata ignorada).`,
+        );
+        continue;
+      }
 
       //cadastrar o nome do ecommerce na tabela de canal de vendas
       try {
@@ -391,7 +400,7 @@ async function limparPedidosEntregues() {
   const horaAtual = new Date().getHours();
   if (ULTIMA_HORA_LIMPEZA_PEDIDOS_ENTREGUES === horaAtual) {
     console.log(
-      `Limpeza de pedidos entregues já executada nesta hora (${horaAtual}h).`
+      `Limpeza de pedidos entregues já executada nesta hora (${horaAtual}h).`,
     );
     return;
   }
@@ -430,7 +439,7 @@ async function limparPedidosEntregues() {
         console.log(
           `Pedidos distribuídos removidos (lista de remoção) para tenant ${
             tenant.id_tenant
-          }: ${distribResult?.deletedCount || 0} registros`
+          }: ${distribResult?.deletedCount || 0} registros`,
         );
 
         // Opcional: limpar a lista global para a próxima execução.
@@ -440,12 +449,12 @@ async function limparPedidosEntregues() {
         //   );
       } else {
         console.log(
-          `Nenhum pedido em PEDIDOS_PARA_REMOVER para o tenant ${tenant.id_tenant}.`
+          `Nenhum pedido em PEDIDOS_PARA_REMOVER para o tenant ${tenant.id_tenant}.`,
         );
       }
     } catch (error) {
       console.log(
-        `Erro ao limpar pedidos entregues para o tenant ${tenant.id_tenant}: ${error.message}`
+        `Erro ao limpar pedidos entregues para o tenant ${tenant.id_tenant}: ${error.message}`,
       );
     }
   }
