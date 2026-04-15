@@ -30,7 +30,7 @@ app.get("/health", (req, res) => {
     status: "UP",
     database: null, // await checkDatabaseConnection() Função que verifica o status do banco de dados
     responseTime: Date.now() - req.startTime,
-    version: "1.0.3",
+    version: "1.0.4",
     memoryUsage: {
       total: os.totalmem(),
       used: os.totalmem() - os.freemem(),

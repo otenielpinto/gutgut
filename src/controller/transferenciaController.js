@@ -3,6 +3,7 @@ import { TransferenciaFilaRepository } from "../repository/transferenciaFilaRepo
 import { TransferenciaMovtoRepository } from "../repository/transferenciaMovtoRepository.js";
 import { ProdutoTinyRepository } from "../repository/produtoTinyRepository.js";
 import { MpkIntegracaoRepository } from "../repository/mpkIntegracaoRepository.js";
+import { MovEstoqueRepository } from "../repository/movEstoqueRepository.js";
 
 import { estoqueController } from "./estoqueController.js";
 
@@ -15,6 +16,7 @@ const STATUS_PENDENTE = "Pendente";
 const STATUS_ERRO = "Erro";
 const SUB_STATUS_PROCESSANDO = "Processando";
 const SUB_STATUS_PROCESSADO_ESTOQUE = "Processado_estoque";
+const SUB_STATUS_PROCESSANDO_PARCIAL = "Processando_parcial";
 
 // Variável global para armazenar as transferências processadas
 let listaTransferencias = [];
@@ -23,12 +25,12 @@ let ultimaDataVerificacao = new Date().toDateString();
 function verificarMudancaDia() {
   const dataAtual = new Date().toDateString();
   console.log(
-    `Verificando mudança de dia: ${dataAtual} - Última verificação: ${ultimaDataVerificacao}`
+    `Verificando mudança de dia: ${dataAtual} - Última verificação: ${ultimaDataVerificacao}`,
   );
 
   if (dataAtual !== ultimaDataVerificacao) {
     console.log(
-      `Dia mudou de ${ultimaDataVerificacao} para ${dataAtual} - Zerando lista de transferências`
+      `Dia mudou de ${ultimaDataVerificacao} para ${dataAtual} - Zerando lista de transferências`,
     );
     listaTransferencias = [];
     ultimaDataVerificacao = dataAtual;
@@ -41,14 +43,16 @@ function verificarMudancaDia() {
 async function init() {
   verificarMudancaDia();
   try {
-    await processarTransferenciaConfirmada();
+    for (const status of [STATUS_PENDENTE, STATUS_CONFIRMADO]) {
+      await processarTransferenciaByStatus(status);
+    }
     await retificarTransferencias();
   } finally {
     await processarEstoque();
   }
 }
 
-async function processarTransferenciaConfirmada() {
+async function processarTransferenciaByStatus(status = STATUS_CONFIRMADO) {
   const c = await TMongo.connect();
   let repository = new TransferenciaRepository(c);
   let mpkIntegracao = new MpkIntegracaoRepository(c);
@@ -57,7 +61,7 @@ async function processarTransferenciaConfirmada() {
   //Busco o id do produto no tiny e atualizo no item da transferencia
   for (let empresa of empresas) {
     let rows = await repository.findAll({
-      status: STATUS_CONFIRMADO,
+      status: status,
       to_id_company: empresa.id,
     });
 
@@ -67,6 +71,7 @@ async function processarTransferenciaConfirmada() {
 
     for (const row of rows) {
       let items = row.items;
+      let movEstoqueRecords = [];
       let nao_achou_produto = 0;
       for (const item of items) {
         let item_nao_conformidade = 0;
@@ -98,19 +103,38 @@ async function processarTransferenciaConfirmada() {
         if (!item.id_saida || item?.id_saida == null)
           item.id_saida = await lib.newUUId();
         item.nao_conformidade = item_nao_conformidade;
+
+        movEstoqueRecords.push({
+          id: item.id_saida,
+          id_tenant: item.from_id_company,
+          cod_produto: item.code,
+          id_produto: item.from_id_product,
+          tipo: "S",
+          qtd: item.quantity,
+          status: 1,
+          observacao: "",
+          dt_movto: new Date()
+        });
       }
 
       //disparar um log de erro se nao achou produto
       if (nao_achou_produto > 0) {
         console.error(
-          `Erro: Produto não encontrado para a transferência: ${row.id}`
+          `Erro: Produto não encontrado para a transferência: ${row.id}`,
         );
         //continue;
       }
 
-      row.sub_status = SUB_STATUS_PROCESSANDO;
+      row.sub_status = status === STATUS_PENDENTE 
+        ? SUB_STATUS_PROCESSANDO_PARCIAL 
+        : SUB_STATUS_PROCESSANDO;
       row.nao_conformidade = nao_conformidade;
       await repository.update(row.id, row);
+
+      if (status === STATUS_PENDENTE && movEstoqueRecords.length > 0) {
+        const movEstoqueRepo = new MovEstoqueRepository(row.from_id_company);
+        await movEstoqueRepo.insertMany(movEstoqueRecords);
+      }
     }
   }
 }
@@ -184,7 +208,7 @@ async function retificarTransferencias() {
       let new_id = null;
       if (!item?.id_entrada || !item?.id_saida) {
         console.log(
-          `Faltando IDs na transferência ${row.id} para o item ${item?.code}`
+          `Faltando IDs na transferência ${row.id} para o item ${item?.code}`,
         );
         continue;
       }
@@ -295,7 +319,7 @@ async function processarEstoque() {
       if (!item?.id_entrada || !item?.id_saida) {
         nao_validado = 1;
         console.log(
-          `Transferencia não validada, falta id_entrada ou id_saida: ${item?.code}`
+          `Transferencia não validada, falta id_entrada ou id_saida: ${item?.code}`,
         );
         continue;
       }
@@ -315,7 +339,7 @@ async function processarEstoque() {
           item.quantity,
           "S",
           row.to_company,
-          doc
+          doc,
         );
 
         if (!ts || ts == null) {
@@ -354,7 +378,7 @@ async function processarEstoque() {
           item.quantity,
           "E",
           row.from_company,
-          doc
+          doc,
         );
 
         if (!te || te == null) {
