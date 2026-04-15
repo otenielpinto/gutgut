@@ -70,8 +70,15 @@ async function processarTransferenciaByStatus(status = STATUS_CONFIRMADO) {
     let nao_conformidade = 0;
 
     for (const row of rows) {
+      // Se STATUS_PENDENTE já foi processado (sub_status = PROCESSANDO_PARCIAL), skip
+      if (status === STATUS_PENDENTE && row?.sub_status === SUB_STATUS_PROCESSANDO_PARCIAL) {
+        console.log(`Transferência Pendente já processada: ${row.id}`);
+        continue;
+      }
+
       let items = row.items;
       let movEstoqueRecords = [];
+      let movEstoqueRepo = new MovEstoqueRepository(row.from_id_company);
       let nao_achou_produto = 0;
       for (const item of items) {
         let item_nao_conformidade = 0;
@@ -104,16 +111,24 @@ async function processarTransferenciaByStatus(status = STATUS_CONFIRMADO) {
           item.id_saida = await lib.newUUId();
         item.nao_conformidade = item_nao_conformidade;
 
+        // Validar se registro já existe (duplicado)
+        const existingRecord = await movEstoqueRepo.findById(item.id_saida);
+        if (existingRecord) {
+          console.log(`MovEstoque já existe: ${item.id_saida}`);
+          continue;
+        }
+
         movEstoqueRecords.push({
           id: item.id_saida,
           id_tenant: item.from_id_company,
+          id_transferencia: row.id,
           cod_produto: item.code,
           id_produto: item.from_id_product,
           tipo: "S",
           qtd: item.quantity,
           status: 1,
           observacao: "",
-          dt_movto: new Date()
+          dt_movto: new Date(),
         });
       }
 
@@ -125,14 +140,14 @@ async function processarTransferenciaByStatus(status = STATUS_CONFIRMADO) {
         //continue;
       }
 
-      row.sub_status = status === STATUS_PENDENTE 
-        ? SUB_STATUS_PROCESSANDO_PARCIAL 
-        : SUB_STATUS_PROCESSANDO;
+      row.sub_status =
+        status === STATUS_PENDENTE
+          ? SUB_STATUS_PROCESSANDO_PARCIAL
+          : SUB_STATUS_PROCESSANDO;
       row.nao_conformidade = nao_conformidade;
       await repository.update(row.id, row);
 
       if (status === STATUS_PENDENTE && movEstoqueRecords.length > 0) {
-        const movEstoqueRepo = new MovEstoqueRepository(row.from_id_company);
         await movEstoqueRepo.insertMany(movEstoqueRecords);
       }
     }

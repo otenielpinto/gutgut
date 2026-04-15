@@ -7,6 +7,7 @@ import { z } from "zod";
 export const movEstoqueSchema = z.object({
   id: z.string().min(1, "ID deve ser preenchido"),
   id_tenant: z.number().int("ID tenant deve ser um inteiro").positive("ID tenant deve ser positivo"),
+  id_transferencia: z.number().int("ID transferência deve ser um inteiro").optional(),
   cod_produto: z.string().min(1, "Código do produto deve ser preenchido"),
   id_produto: z.string().min(1, "ID do produto deve ser preenchido"),
   tipo: z.enum(["E", "S"], { message: "Tipo deve ser 'E' (entrada) ou 'S' (saida)" }),
