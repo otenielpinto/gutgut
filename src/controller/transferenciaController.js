@@ -18,6 +18,10 @@ const SUB_STATUS_PROCESSANDO = "Processando";
 const SUB_STATUS_PROCESSADO_ESTOQUE = "Processado_estoque";
 const SUB_STATUS_PROCESSANDO_PARCIAL = "Processando_parcial";
 
+// Status codes for tmp_mov_estoque processing (numeric)
+const STATUS_MOV_SUCESSO = 10;
+const STATUS_MOV_ERRO = 500;
+
 // Variável global para armazenar as transferências processadas
 let listaTransferencias = [];
 let ultimaDataVerificacao = new Date().toDateString();
@@ -71,7 +75,10 @@ async function processarTransferenciaByStatus(status = STATUS_CONFIRMADO) {
 
     for (const row of rows) {
       // Se STATUS_PENDENTE já foi processado (sub_status = PROCESSANDO_PARCIAL), skip
-      if (status === STATUS_PENDENTE && row?.sub_status === SUB_STATUS_PROCESSANDO_PARCIAL) {
+      if (
+        status === STATUS_PENDENTE &&
+        row?.sub_status === SUB_STATUS_PROCESSANDO_PARCIAL
+      ) {
         console.log(`Transferência Pendente já processada: ${row.id}`);
         continue;
       }
@@ -127,10 +134,10 @@ async function processarTransferenciaByStatus(status = STATUS_CONFIRMADO) {
           tipo: "S",
           qtd: item.quantity,
           status: 1,
-          observacao: "",
+          observacao: row?.to_company || "",
           dt_movto: new Date(),
         });
-      }
+      } // for item
 
       //disparar um log de erro se nao achou produto
       if (nao_achou_produto > 0) {
@@ -452,6 +459,98 @@ async function processarEstoque() {
   }
 }
 
+/**
+ * Process pending stock decrease records from tmp_mov_estoque collection.
+ * Validates duplicates via TransferenciaMovtoRepository.findById(),
+ * processes via estoqueController.transferir(), and records results.
+ *
+ * @returns {Promise<void>}
+ */
+async function baixarEstoqueTmpMovEstoque() {
+  const c = await TMongo.connect();
+  const transferenciaMovto = new TransferenciaMovtoRepository(c);
+  const mpkIntegracao = new MpkIntegracaoRepository(c);
+
+  const empresas = await mpkIntegracao.findAll({});
+
+  if (!Array.isArray(empresas) || empresas.length <= 0) {
+    console.log("Nenhum tenant encontrado para processar");
+    return;
+  }
+
+  for (const empresa of empresas) {
+    // Skip tenant if missing token
+    if (!empresa.token) {
+      console.log(`Tenant ${empresa.id} sem token - ignorando`);
+      continue;
+    }
+
+    // Create MovEstoqueRepository with tenant filtering
+    const movEstoqueRepo = new MovEstoqueRepository(empresa.id);
+    const pendingRecords = await movEstoqueRepo.findAll({
+      status: 1,
+      id_tenant: empresa.id,
+    });
+
+    if (!Array.isArray(pendingRecords) || pendingRecords.length <= 0) {
+      continue;
+    }
+
+    console.log(
+      `Processando ${pendingRecords.length} registros pendentes para tenant ${empresa.id}`,
+    );
+
+    for (const record of pendingRecords) {
+      try {
+        // Check for duplicate in transferencia_movto
+        const existingRecord = await transferenciaMovto.findById(record.id);
+
+        if (existingRecord) {
+          console.log(`Registro duplicado encontrado: ${record.id}`);
+          await movEstoqueRepo.update(record.id, { status: STATUS_MOV_ERRO });
+          continue;
+        }
+
+        // Process stock decrease via Tiny ERP
+        const result = await estoqueController.transferir(
+          empresa.token,
+          record.id_produto,
+          record.qtd,
+          record.tipo,
+          record.observacao || "",
+          record.id_transferencia,
+        );
+
+        if (!result || result === null) {
+          console.log(
+            `Erro ao processar registro ${record.id} - produto ${record.id_produto}`,
+          );
+          await movEstoqueRepo.update(record.id, { status: STATUS_MOV_ERRO });
+          continue;
+        }
+
+        // Record success in transferencia_movto
+        await transferenciaMovto.create({
+          id: record.id,
+          id_produto: record.cod_produto,
+          id_transferencia: record.id_transferencia || null,
+          status: STATUS_CONCLUIDO,
+          tipo: record.tipo,
+          response: result,
+          created_at: new Date(),
+        });
+
+        // Update original record status to success
+        await movEstoqueRepo.update(record.id, { status: STATUS_MOV_SUCESSO });
+        console.log(`Registro processado com sucesso: ${record.id}`);
+      } catch (error) {
+        console.log(`Erro no processamento do registro ${record.id}:`, error);
+        await movEstoqueRepo.update(record.id, { status: STATUS_MOV_ERRO });
+      }
+    }
+  }
+}
+
 async function auditoriaTransferencias() {
   // Esse script foi rodado para corrigir transferências que não tinham os ids de entrada e saída preenchidos. 30-07-2025
   return;
@@ -516,6 +615,7 @@ async function auditoriaTransferencias() {
 
 const transferenciaController = {
   init,
+  baixarEstoqueTmpMovEstoque,
 };
 
 export { transferenciaController };
