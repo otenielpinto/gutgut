@@ -132,7 +132,7 @@ async function processarTransferenciaByStatus(status = STATUS_CONFIRMADO) {
           cod_produto: item.code,
           id_produto: item.from_id_product,
           tipo: "S",
-          qtd: item.quantity,
+          qtd: item.qtd_original, // Usar quantidade original para estoque de saida ( motivo : eh processado antes )
           status: 1,
           observacao: row?.to_company || "",
           dt_movto: new Date(),
