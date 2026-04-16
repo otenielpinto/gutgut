@@ -52,6 +52,10 @@ async function init() {
     }
     await retificarTransferencias();
   } finally {
+    //precisa ser nessa ordem aqui
+    await baixarEstoqueTmpMovEstoque();
+
+    //rodar por ultimo
     await processarEstoque();
   }
 }
@@ -226,7 +230,7 @@ async function retificarTransferencias() {
     let new_id = null;
 
     for (const item of row?.items) {
-      console.log("Retificando item: ", item);
+      //console.log("Retificando item: ", item);
       let new_id = null;
       if (!item?.id_entrada || !item?.id_saida) {
         console.log(
@@ -239,6 +243,7 @@ async function retificarTransferencias() {
       let entrada = await transferenciaMovto.findById(item?.id_entrada);
 
       if (!saida) {
+        console.log(`Não tem movimento de saída para o item: ${item?.code}`);
         //item.from_id_product
         new_id = await acharNovoIdProduto({
           c,
@@ -254,6 +259,7 @@ async function retificarTransferencias() {
       }
 
       if (!entrada) {
+        console.log(`Não tem movimento de entrada para o item: ${item?.code}`);
         new_id = await acharNovoIdProduto({
           c,
           id_tenant: row.to_id_company,
@@ -426,6 +432,48 @@ async function processarEstoque() {
             response: te,
             created_at: new Date(),
           });
+
+          // Verificar se houve diferença na quantidade da entrada
+          if (item.quantity !== item.qtd_original) {
+            const qtdDiferenca = item.quantity - item.qtd_original;
+            const movEstoqueRepo = new MovEstoqueRepository(
+              item.from_id_company,
+            );
+
+            // NOVO: Validar se o lançamento da saída original existe
+            const saidaRecord = await movEstoqueRepo.findById(item.id_saida);
+            if (!saidaRecord) {
+              console.log(
+                `Lançamento de saída não encontrado para ${item.code}, ignorando diferença`,
+              );
+            } else {
+              // Se recebeu MAIS: precisa dar SAÍDA do estoque da origem
+              // Se recebeu MENOS: precisa dar ENTRADA no estoque da origem
+              const tipo = qtdDiferenca > 0 ? "S" : "E";
+              let observacao = `Ajuste Automatico por diferenca Qtd original: ${item.qtd_original} - Qtd atual: ${item.quantity}`;
+
+              try {
+                await movEstoqueRepo.create({
+                  id: await lib.newUUId(), //necessario criar um novo id para o lançamento de ajuste
+                  id_tenant: item.from_id_company,
+                  id_transferencia: row.id,
+                  cod_produto: item.code,
+                  id_produto: item.from_id_product,
+                  tipo: tipo,
+                  qtd: Math.abs(qtdDiferenca),
+                  status: 1,
+                  observacao: observacao,
+                  dt_movto: new Date(),
+                });
+                console.log(observacao);
+              } catch (error) {
+                console.log(
+                  `Erro ao registrar diferença de estoque: ${item.code}`,
+                  error,
+                );
+              }
+            }
+          }
         }
       }
       //******************************************************************************************* */
@@ -616,6 +664,7 @@ async function auditoriaTransferencias() {
 const transferenciaController = {
   init,
   baixarEstoqueTmpMovEstoque,
+  retificarTransferencias,
 };
 
 export { transferenciaController };

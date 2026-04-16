@@ -48,6 +48,7 @@ async function init() {
   //console.log("Concluido " + lib.currentDateTimeStr());
   //await produtoUrlController.init();
 
+  //await transferenciaController.retificarTransferencias();
   //return;
 
   try {

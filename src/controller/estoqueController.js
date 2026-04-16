@@ -17,7 +17,7 @@ function isIdProdutoInvalido(response) {
     return erros.some(
       (e) =>
         e.erro === "Campo idProduto inválido." ||
-        e.erro === "Não é possível lançar estoque de um produto kit."
+        e.erro === "Não é possível lançar estoque de um produto kit.",
     );
   } catch (error) {
     return false;
@@ -34,10 +34,11 @@ async function produtoAtualizarEstoque(token, id_produto, quantity) {
   if (min < 10) minFmt = `0${min}`;
   if (quantity < 0) quantity = 0;
 
-  let obs =
+  let obs = (
     `Estoque Movimentado : ${quantity} as ` +
     lib.formatDateBr(date) +
-    ` ${hora}:${minFmt}:${seg} by T7Ti `;
+    ` ${hora}:${minFmt}:${seg} by T7Ti `
+  ).substring(0, 100);
 
   const estoque = {
     idProduto: id_produto,
@@ -53,7 +54,7 @@ async function produtoAtualizarEstoque(token, id_produto, quantity) {
 
   for (let t = 1; t < 5; t++) {
     console.log(
-      "Atualizando estoque " + t + "/5  " + id_produto + " qtd: " + quantity
+      "Atualizando estoque " + t + "/5  " + id_produto + " qtd: " + quantity,
     );
     response = await tiny.post("produto.atualizar.estoque.php", data);
     response = await tiny.tratarRetorno(response, "registros");
@@ -114,7 +115,7 @@ async function transferir(
   cod_empresa,
   doc,
   devolucao = null,
-  deposito = null
+  deposito = null,
 ) {
   let date = new Date();
   let hora = date.getHours(); // 0-23
@@ -137,10 +138,11 @@ async function transferir(
     }
   } else historico = `Balanco estoque ${cod_empresa} `;
 
-  let obs =
+  let obs = (
     `${historico}: ${quantity} as ` +
     lib.formatDateBr(date) +
-    ` ${hora}:${minFmt}:${seg} by T7Ti `;
+    ` ${hora}:${minFmt}:${seg} by T7Ti `
+  ).substring(0, 100);
 
   const estoque = {
     idProduto: id_produto,
@@ -171,7 +173,7 @@ async function transferir(
         " tipo: " +
         tipo +
         " doc : " +
-        doc
+        doc,
     );
 
     response = await tiny.post("produto.atualizar.estoque.php", data);
@@ -180,7 +182,7 @@ async function transferir(
     let hasProductError = isIdProdutoInvalido(response);
     if (hasProductError) {
       console.log(
-        `Erro na transferencia de estoque - Produto Invalido ID: ${id_produto}`
+        `Erro na transferencia de estoque - Produto Invalido ID: ${id_produto}`,
       );
       return null;
     }
